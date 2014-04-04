@@ -12,6 +12,10 @@ stddev       : float     # standard deviation of correlations
 
 classdef TrueCov < dj.Relvar
     
+    properties(Constant)
+        table = dj.Table('sim.TrueCov')
+    end
+    
     methods
         function fill(self)
             %self.fill_(50,6,0);

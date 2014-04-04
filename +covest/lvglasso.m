@@ -78,13 +78,19 @@ function s = update(s,SigmaO,alpha,beta,mu,tau,max_latent)
 
 % update s.R
 B = mu*SigmaO - mu*s.Lambda - s.S + s.L;
-[U,D] = eig(B); d = diag(D);
+try
+[U,D] = eig(B); 
+catch
+    % this is a hack that fixed a few cases of "eig did not not converge"
+    [U,D] = eigs(B,size(B,1)-1);
+end
+d = diag(D);
 s.eigR = (-d + sqrt(d.^2+4*mu))/2;
 s.R = sym(U*diag(s.eigR)*U');
 
 % update s.S and s.L
 Gradpartial = s.S - s.L - s.R + mu*s.Lambda;
-G = s.S - tau * Gradpartial; H = s.L + tau * Gradpartial;
+G = s.S - tau * Gradpartial; H = s.L + tau*Gradpartial;
 s.S = sym(soft_shrink(G, tau*mu*alpha));
 [U,D] = eig_(H,max_latent); s.eigL = max(0,diag(D)-tau*mu*beta);
 s.L = sym(U*diag(s.eigL)*U');

@@ -1,7 +1,7 @@
 function out = crossvalIndex(n,kfold,chunkSize)
-% This function is similar to Matlab's crossvaldin with the 'kfold' option 
+% This function is similar to Matlab's crossvaldin with the 'kfold' option
 % except the indices are split into contiguous blocks of approximately
-% between chunkSize and 2*chunkSize in length. 
+% between chunkSize and 2*chunkSize in length.
 
 assert(chunkSize*kfold*2 <= n, 'chunkSize is too large')
 maxBlockSize = ceil(n/kfold);
@@ -13,9 +13,9 @@ span = randi(chunkSize);
 curr = 0;
 while any(unassigned)
     unassigned(fold) = unassigned(fold) - span;
-    out(min(curr+(1:span),end)) = fold; 
+    out(min(curr+(1:span),end)) = fold;
     curr = curr+span;
-
+    
     fold = mod(fold+randi(kfold-1)-1,kfold)+1;
     if unassigned(fold) <= 2*chunkSize
         span = unassigned(fold);

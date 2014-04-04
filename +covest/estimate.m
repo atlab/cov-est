@@ -28,8 +28,10 @@ switch estimator
         scale = sqrt(mean(diag(C)));  % normalize matrix
         C = scale\C/scale;
         alpha = hypers(2);
-        beta = 0;
-        extras = covest.lvglasso(C, alpha, beta, struct('refit',true,'max_latent',hypers(1)));
+        beta = hypers(1);
+%        beta = 0;
+%        extras = covest.lvglasso(C, alpha, beta, struct('refit',true,'max_latent',hypers(1)));
+        extras = covest.lvglasso(C, alpha, beta, struct('refit',true,'max_latent',inf));
         extras.S = scale\extras.S/scale;   % scale back 
         extras.L = scale\extras.L/scale;
         [H,D] = svds(extras.L,sum(~~extras.eigL));
