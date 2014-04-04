@@ -6,26 +6,21 @@ pop.TrialTraceSet (computed) # traces associated with trials
 -> pop.BinOpt
 -----
 nneurons                    : smallint                      # the number of neurons included in the analysis
-cellnums                    : longblob                      # list of participating cell numbers
-ndirs=null                  : smallint                      # number of directions
-dirs=null                   : longblob                      # direction of grating movement
-psths=null                  : longblob                      # peristimulus histograms for each cell and direction
-binned_traces               : longblob                      # array of binned traces
-binsize_ms                  : float                         # true bin size
-epoch_seconds               : float                         # the duration of the analyzed episode
-
+cellnums                    : longblob                      # cell selection
+ndirs                       : smallint                      # number of directions
+dirs                        : longblob                      # direction of grating movement
 %}
 
 classdef TrialTraceSet < dj.Relvar & dj.AutoPopulate
 
 	properties
-		popRel  % !!! update the populate relation
+        popRel = (aod.TracePreprocessSet*aod.UniqueCells*pop.StableScans*pop.BinOpt) ...
+            & acq.AodStimulationLink & 'preprocess_method_num=5' & 'bin_opt=0'
 	end
 
 	methods(Access=protected)
 
 		function makeTuples(self, key)
-		%!!! compute missing fields for key here
 			self.insert(key)
 		end
 	end
