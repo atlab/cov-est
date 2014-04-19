@@ -48,7 +48,7 @@ classdef AodBinnedTraces < dj.Relvar & dj.AutoPopulate
             % subtract stimulus
             if opt.psth_ms>0
                 disp 'subtracting stimulus response...'
-                [S,psth,oris] = pop.AodBinnedTraces2.computeStim(key,X,0,opt.psth_ms);
+                [S,psth,oris] = pop.AodBinnedTraces.computeStim(key,X,0,opt.psth_ms);
                 key.ndirs = length(oris);
                 key.dirs = oris;
                 key.psths = psth;

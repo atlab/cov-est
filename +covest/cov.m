@@ -1,4 +1,6 @@
 % covariance matrix without mean subtraction
 
-function C = cov(X)
-C = X'*X/size(X,1);
+function [C,n] = cov(X)
+ix = ~any(isnan(X),2);
+n = sum(ix);
+C = X(ix,:)'*X(ix,:)/sum(ix);

@@ -1,31 +1,31 @@
-function [C, hypers, extras] = crossEstimateHyper(X, loss, estimator, varargin)
+function [hypers, visited, losses] = crossEstimateHyper(X, loss, varEstimation, corrEstimation, varargin)
 % find the values of hyperparamters that minimize the cross-validated loss
 % by K-fold cross-validation.
 %
 % INPUTS:
-%     X - n*p dataset, n=sample size, p=dimension.
+%     X = nBins * nDirs * nTrials * nCells
 %     loss - loss function to be minimized, loss(C,Sigma) where C is estimate
-%     estimator -  the name of the estimator as accepted by covest.estimate
-%     varargin - lists of valid values for each hyperparameter
+%     varEstimation -  string identifying the method for estimating the variance
+%     corrEstimation -
+%     varargin - lists of valid values for each hyperparameter, in sequence
 %
 % OUTPUTS:
 %     C - optimized covariance estimate
 %     varargout - optimal values of hyperparameters
 
-[n,p] = size(X);
 searchSpace = varargin;             % the list of values for each hyperparameter
 dims = cellfun(@length, searchSpace);
 nHypers = length(dims);
+assert(nHypers>0)
+
 visited = [];  % visited indices
 losses =  [];                 % measured losses at visited indices
 K = 10;  % K-fold cross-validation
-cvInd = covest.crossvalIndex(n,K,round(n/(3*K)));
-
 
 % coarse random search to seed the local search
 disp 'random search'
 decimate = 10;
-for i=1:prod(ceil(dims/decimate))  % effectively decimate by a factor in each dimension
+for i=1:prod(ceil(dims/decimate/nHypers^.8));  %
     visit(arrayfun(@(d) randi(d), dims))
 end
 
@@ -54,7 +54,6 @@ end
 [mix{1:nHypers}] = ind2sub(dims,visited(j));
 hypers = cellfun(@(h,ix) h(ix), searchSpace, mix);
 fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
-[C,extras] = covest.estimate(X,estimator,hypers);
 
 
 
@@ -73,6 +72,7 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
 
 
     function L = getLoss(hypers)
+        %
         fprintf('%g  ', hypers)
         L = nan(1,K);
         for k=1:K

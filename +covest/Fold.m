@@ -1,5 +1,5 @@
 %{
-pop.Fold (lookup) # my newest table
+covest.Fold (lookup) # my newest table
 k      :   tinyint   # kth fold
 nfolds :   tinyint   # total folds
 -----
