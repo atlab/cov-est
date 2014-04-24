@@ -1,39 +1,34 @@
 %{
 covest.Method (lookup) # covariance matrix estimation methods
-corr_method     : tinyint                # covarianc
+method          : tinyint                # covariance estimation method
 ---
 include_spont               : tinyint                       # 1=yes, 0=no
 condition                   : tinyint                       # 0=all conditions, 1=first conditoin only, 2=second condition only
-var_estimation              : enum('uniform','linear to mean','per condition','per bin') # ways to estimate the variance
-corr_estimation             : enum('sample','diag','factor','lv-glasso') #
+regularization              : enum('sample','diag','factor','glasso','lv-glasso') # 
 loss_fun                    : varchar(255)                  # loss function for model selection
 hyperparam_space            : longblob                      # arrays of hyperparameter values
-
 %}
 
 classdef Method < dj.Relvar
     methods
         function fill(self)
-            loss =  '@(S,Sigma)(trace(Sigma/S)+covest.logDet(S))/size(S,1)';
+            loss =  '@(S,Sigma)(trace(Sigma/S)+covest.lib.logDet(S))/size(S,1)';
             self.inserti({
                 
-            0   0 0  'uniform'        'sample'  loss []
-            1   0 1  'uniform'        'sample'  loss []
-            2   0 2  'uniform'        'sample'  loss []
-            3   1 0  'uniform'        'sample'  loss []
+            0   1 0  'sample'  loss []
+            1   0 0  'sample'  loss []
+            2   0 1  'sample'  loss []
+            3   0 2  'sample'  loss []
             
-            4   0 0  'linear to mean' 'sample'  loss []
-            5   0 0  'per condition'  'sample'  loss []
-            6   0 0  'per bin'        'sample'  loss []
+            10  1 0  'diag'  loss  {exp(-5:0.05:0),exp(-10:0.05:0)}
+                        
+            30  1 0  'factor'  loss  {0:70,1,exp(-6:0.05:0)}
             
-            10  0 0  'uniform'        'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
-            11  0 1  'uniform'        'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
-            12  0 2  'uniform'        'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
-            13  1 0  'uniform'        'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
+            50  1 0  'glasso'  loss  {exp(-6:.1:-3),exp(-6:0.05:0)}
             
-            14  0 0  'linear to mean' 'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
-            15  0 0  'per condition'  'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
-            16  0 0  'per bin'        'diag'  loss  {exp(-5:0.04:0),exp(-10:0.02:0)}
+            60  1 0  'lv-glasso' loss {exp(-6:.1:-3),exp(-6:.05:0),exp(-6:.1:1)}
+            
+            
             
             })
         end

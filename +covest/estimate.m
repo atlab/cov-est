@@ -1,79 +1,84 @@
-function [C, V, extras] = estimate(X, M, varEstimation, corrEstimation, hypers)
+function [C, M, extras] = estimate(X, M, evokedBins, covEstimation, hypers)
 % estimate covariance matrix C
 %
-% Input: 
+% Input:
 %    X := nBins * nConds * nTrials * nCells
-%    X is zero-mean signal
-% 
+%
 % Output:
-%    C  - correlation matrix
-%    V  - matrix of variances:  nBins * nConds * 1 * nCells
+%    C  - covariance matrix
 %    extras - structure with additional information about the estimate
-  
+
 
 extras = struct;
 [nBins, nConds, nTrials, nCells] = size(X);
 
-switch varEstimation
-    case 'uniform'
-        V = reshape(nanvar(reshape(X,[],nCells)), 1,1,1,nCells);        
-        
-    case 'linear to mean'
-        % variance is assumed to be proportional to mean
-        V = nanvar(X,[],3);
-        b = arrayfun(@(i) regress(reshape(V(:,:,:,i),[],1),reshape(M(:,:,:,i),[],1)), 1:nCells);
-        V = bsxfun(@times, M, reshape(b,1,1,1,nCells));
-    
-    case 'per condition'
-        V = reshape(nanvar(reshape(permute(X, [1 3 2 4]),[],nConds,nCells)), 1,nConds,1,nCells);
-        
-    case 'per bin'
-        V = nanvar(X,[],3);
-        
-    otherwise 
-        error 'unknown variance estimation'    
+% subtract mean response
+if isempty(M)
+    if size(X,1)<=evokedBins
+        M = nanmean(X,3);
+    else
+        M1 = nanmean(X(1:evokedBins,:,:,:),3);   % binwise mean of evoked response
+        M2 = reshape(nanmean(reshape(X(evokedBins+1:end,:,:,:),[],nCells)),1,1,1,nCells);  % common mean in intertrial periods
+        M2 = repmat(M2,size(X,1)-evokedBins,nConds);
+        M = cat(1,M1,M2);
+    end
 end
 
-% select cells that have 
-    
-switch corrEstimation
+X = bsxfun(@minus, X, M);
+X = reshape(X,[],nCells);
+X = X(~any(isnan(X),2),:);
+
+
+switch covEstimation
     case 'sample'
-        assert(nargin<3 || isempty(hypers), 'invalid hyperparameters')
-        v = sqrt(max(V,0.001*median(V(:))));
-        X = bsxfun(@rdivide, X, v);
-        C = covest.cov(reshape(X,[],nCells));
-        C = C - diag(diag(C)) + eye(size(C));  % replace diagonal with 1s
+        assert(isempty(hypers),'invalid hyperparameters')
+        C = covest.lib.cov(X);
         
-     case 'diag'
-         % takes two hypers:  variance shrinkage,  correlation shrinkage
-         assert(length(hypers)==2, 'invalid hyperparameters')
-         C = covest.shrink(X,hypers(1),hypers(2));
-         
-%     case 'factor'
-%         % takes to hypers: nlatent and shrinkage intensity
-%         assert(length(hypers)==2, 'invalid hyperparameters')
-%         C = covest.cov(X);
-%         [L,psi] = covest.factor(C,hypers(1));
-%         C = (1-hypers(2))*C + hypers(2)*(L*L' + diag(psi));  % shrink toward factor model
-%         extras.loading_matrix = L;
-%         extras.indep_vars = psi;
-%         
-%     case 'lv-glasso'
-%         % set lv-glasso options
-%         C = covest.cov(X);
-%         scale = sqrt(mean(diag(C)));  % normalize matrix
-%         C = scale\C/scale;
-%         alpha = hypers(2);
-%         beta = hypers(1);
-% %        beta = 0;
-% %        extras = covest.lvglasso(C, alpha, beta, struct('refit',true,'max_latent',hypers(1)));
-%         extras = covest.lvglasso(C, alpha, beta, struct('refit',true,'max_latent',inf));
-%         extras.S = scale\extras.S/scale;   % scale back 
-%         extras.L = scale\extras.L/scale;
-%         [H,D] = svds(extras.L,sum(~~extras.eigL));
-%         extras.H = H*sqrt(D);
-%         C = inv(extras.S - extras.H*extras.H');
+    case 'diag'
+        % takes two hypers:  variance shrinkage,  correlation shrinkage
+        assert(length(hypers)==2, 'invalid hyperparameters')
+        C = covest.lib.shrink(X,hypers(1),hypers(2));
+        
+    case 'factor'
+        % takes 3 hypers: nlatent, shrink, and individual variance shrink
+        assert(length(hypers)==3, 'invalid hyperparameters')
+        C = covest.lib.cov(X);
+        [L,psi] = covest.lib.factor(C,hypers(1));
+        psi = (1-hypers(3))*psi + hypers(3)*mean(psi);
+        C = (1-hypers(2))*C + hypers(2)*(L*L' + diag(psi));  % shrink toward factor model
+        extras.loading_matrix = L;
+        extras.indep_vars = psi;
+        
+    case 'glasso'
+        assert(length(hypers)==2)
+        C = covest.lib.cov(X);
+        C = hypers(1)*mean(diag(C))*eye(size(C)) + (1-hypers(1))*C; 
+        
+        scale = mean(diag(C));
+        C = C/scale;
+        alpha = hypers(2);
+        beta = 10;
+        extras = covest.lib.lvglasso(C,alpha,beta,struct('refit',true,'max_latent',0));
+        extras.S = extras.S/scale;  % scale back
+        C = inv(extras.S);
+        
+        
+    case 'lv-glasso'
+        % set lv-glasso options
+        C = covest.lib.cov(X);
+        C = hypers(1)*mean(diag(C))*eye(size(C)) + (1-hypers(1))*C;
+        
+        scale = mean(diag(C));
+        C = C/scale;
+        alpha = hypers(2);
+        beta = hypers(3);
+        extras = covest.lib.lvglasso(C,alpha,beta,struct('refit',true));
+        extras.S = extras.S/scale;  % scale back
+        extras.L = extras.L/scale;
+        [H,D] = svds(extras.L,sum(~~extras.eigL));
+        extras.H = H*sqrt(D);
+        C = inv(extras.S - extras.H*extras.H');
         
     otherwise
-        error 'unknown correlation estimator'
+        error 'unknown covariance estimator'
 end

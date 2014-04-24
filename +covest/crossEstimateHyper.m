@@ -1,19 +1,17 @@
-function [hypers, visited, losses] = crossEstimateHyper(X, loss, varEstimation, corrEstimation, varargin)
+function [hypers, visited, losses] = crossEstimateHyper(X, evokedBins, loss, covEstimation, searchSpace)
 % find the values of hyperparamters that minimize the cross-validated loss
 % by K-fold cross-validation.
 %
 % INPUTS:
 %     X = nBins * nDirs * nTrials * nCells
 %     loss - loss function to be minimized, loss(C,Sigma) where C is estimate
-%     varEstimation -  string identifying the method for estimating the variance
-%     corrEstimation -
-%     varargin - lists of valid values for each hyperparameter, in sequence
+%     covEstimation -  string identifying the method for estimating the variance
+%     hypers - lists of valid values for each hyperparameter, in sequence
 %
 % OUTPUTS:
 %     C - optimized covariance estimate
 %     varargout - optimal values of hyperparameters
 
-searchSpace = varargin;             % the list of values for each hyperparameter
 dims = cellfun(@length, searchSpace);
 nHypers = length(dims);
 assert(nHypers>0)
@@ -23,11 +21,12 @@ losses =  [];                 % measured losses at visited indices
 K = 10;  % K-fold cross-validation
 
 % coarse random search to seed the local search
-disp 'random search'
+fprintf 'random search: '
 decimate = 10;
-for i=1:prod(ceil(dims/decimate/nHypers^.8));  %
-    visit(arrayfun(@(d) randi(d), dims))
-end
+nRandom = ceil(prod(max(1,dims/decimate)/sum(dims>1)));
+fprintf('%d points\n', nRandom)
+ix = arrayfun(@(~) arrayfun(@(d) randi(d), dims), 1:nRandom, 'uni', false);
+cellfun(@visit,ix);
 
 % pattern search for the optimum hyperparameter values
 disp 'pattern search'
@@ -37,7 +36,7 @@ bestLoss = min(losses);
 while true
     lastBestLoss = bestLoss;
     [bestLoss,j] = min(losses);
-    if bestLoss == lastBestLoss && all(step<=1)
+    if isnan(bestLoss) || bestLoss == lastBestLoss && all(step<=1)
         break
     end
     step = ceil(step/2);
@@ -62,29 +61,31 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
         % but return if already visited
         ix = num2cell(max(1,min(dims,ix)));
         hypers_ = cellfun(@(x,i) x(i), searchSpace, ix);
-        ix = sub2ind(dims,ix{:});
+        ix = sub2ind([dims ones(1,2-length(dims))],ix{:});
         alreadyVisited = ismember(ix,visited);
         if ~alreadyVisited
             visited(end+1) = ix;
-            losses(end+1) = getLoss(hypers_);
+            losses(end+1) = cvLoss(hypers_);
         end
     end
 
 
-    function L = getLoss(hypers)
-        %
+    function L = cvLoss(hypers)
+        % compute avearge cross-validation loss
         fprintf('%g  ', hypers)
         L = nan(1,K);
         for k=1:K
             % record average loss
-            CC = covest.estimate(X(cvInd~=k,:),estimator, hypers);
-            testC = covest.cov(X(cvInd==k,:));
-            L(k) = loss(CC,testC);
+            [XTrain,XTest] = covest.splitTrials(X,k,K);
+            C0 = covest.estimate(XTrain, [], evokedBins, 'sample', {});
+            C = covest.estimate(XTrain, [], evokedBins, covEstimation, hypers);
+            L(k) = loss(C, ...
+                covest.estimate(XTest, [], evokedBins, 'sample', {}));
+            if isnan(L(k)), break, end
         end
-        if any(isnan(L))
+        L = mean(L);
+        if isnan(L)
             L = inf;
-        else
-            L = mean(L);
         end
         fprintf(':  mean loss %g\n', L)
     end

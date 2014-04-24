@@ -29,6 +29,7 @@ def.maxiter = 1e4;
 def.stoptol = 1e-5;
 def.tau = 0.6;
 def.refit = false;
+def.max_latent = size(SigmaO,1)-1;
 
 % parameter opts overrides defaults
 if nargin<4
@@ -107,7 +108,7 @@ x = sign(z).*max(abs(z)-tau,0);
 
 
 function obj = objective(s,SigmaO,alpha,beta)
-obj = sum(sum((s.S-s.L).*SigmaO)) - covest.logDet(s.S-s.L) + sum(sum(alpha.*abs(s.S))) + beta*sum(s.eigL);
+obj = sum(sum((s.S-s.L).*SigmaO)) - logDet(s.S-s.L) + sum(sum(alpha.*abs(s.S))) + beta*sum(s.eigL);
 
 
 function [U,d] = eig_(H,max_latent)
@@ -122,3 +123,11 @@ d = diag(d);
 ix = ix(1:max_latent);
 U = U(:,ix);
 d = diag(d(ix));
+
+function [ld,A] = logDet(A)
+d = eig(A);
+if ~all(d>=0)
+    ld = nan;
+else
+    ld = sum(log(d));
+end

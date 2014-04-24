@@ -25,7 +25,7 @@ function [C,lambda] = shrink(X,lambdaVar,lambda)
 
 % shrink variance toward median variance
 vars = mean(X.^2);
-medVar = median(vars);
+medVar = max(1e-6,median(vars));
 
 doLambdaVar  = nargin < 2 || isempty(lambdaVar) || isnan(lambdaVar);
 doLambda = nargin < 3;

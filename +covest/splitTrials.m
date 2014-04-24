@@ -6,9 +6,11 @@ nTrials = size(X,3);
 if nFolds == 1
     XTest = [];
 else
+    s = rng;
+    rng(0) % alreays split the same way
     iTrials = mod(1:nTrials,nFolds)+1;
-    rng(0)   % ensure the same folds every time
     iTrials = iTrials(randperm(end));
     XTest = X(:,:,iTrials==fold,:);
     X = X(:,:,iTrials~=fold,:);
+    rng(s)
 end
