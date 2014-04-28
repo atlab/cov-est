@@ -3,7 +3,98 @@
 
 classdef plots
     
+    properties(Constant)
+        figPath = '~/cov/figures/src/'
+    end
+    
     methods(Static)
+        
+        function fig3
+            
+            useQuad = false;
+            
+            if useQuad
+                fname = 'comparison-quad';
+                pairs = {
+                    };
+            else
+                fname = 'comparison';
+                pairs = [
+                    10  0  .09  .05
+                    30  0  .09  .05
+                    40  0  .09  .05
+                    70  0  .09  .05
+                    
+                    30 10  .015  .01
+                    40 10  .015  .01
+                    70 10  .015  .01
+                    
+                    40 30  .015  .01
+                    70 30  .015  .01
+                    
+                    70 40  .015  .01
+                    ];
+            end
+            nbins = 24;
+            
+            c = covest.CovMatrix & 'nfolds>1';
+            c1 = pro(c, 'method->m1','cv_loss->l1');
+            c2 = pro(c, 'method->m2','cv_loss->l2');
+            
+            for i=1:size(pairs,1)
+                r = struct('m1',pairs(i,1),'m2',pairs(i,2));
+                %[l1,l2] = fetchn(c1*c2 & r, 'l1', 'l2');
+                [l1,l2] = fetchn(covest.ActiveCells, c1*c2 & r, 'avg(l1)->ll1','avg(l2)->ll2');
+                
+                fig = Figure(1, 'size', [40 30]);
+                rr = pairs(i,3);
+                bins = linspace(-rr,rr,nbins);
+                x = l2-l1;
+                %                xarrow = fetch1(r & arrowKey, 'l1-l2->d');
+                a = hist(min(1,x),bins);
+                bar(bins,a)
+                p = signrank(x);
+                fprintf('%2d-%2d Significance %1.0e, median difference = %g\n', ...
+                                     pairs(i,2),pairs(i,1),p, median(x))
+                xlim([-1 1]*rr*(1+1.1/nbins))
+                ylim([-.5 14])
+                hold on
+                plot([0 0], ylim,'k')
+                plot([0 0]+median(x), ylim, ':','Color',[.6 0 0])
+                hold off
+                box off
+                set(gca, 'YColor',[1 1 1]*0.99,'YTick',[])
+                ticks = (-1:1)*pairs(i,4);
+                colormap gray
+                
+                set(gca,'XTick',ticks,'XTickLabel',nozero(ticks))
+                set(gca,'YTick',10)
+                set(gca,'Position', [.05    .2    .8    .8])
+                hold on
+                PlotAxisAtOrigin([1 1])
+                hold off
+                
+                fig.cleanup
+                fig.save(fullfile(covest.plots.figPath,sprintf('%s-%02d-vs-%02d.eps',fname,pairs(i,1),pairs(i,2))))
+            end
+            
+            function s=nozero(f)
+                % remove leading zeros in decimal fractions
+                if isscalar(f)
+                    s = sprintf('%g',f);
+                    if strncmp(s,'-0.',3)
+                        s(2)='';
+                    elseif strncmp(s,'0.',2)
+                        s(1)='';
+                    end
+                else
+                    s = arrayfun(@(f) nozero(f), f, 'uni', false);
+                end
+            end
+        end
+        
+        
+        
         function compareCorrMethods
             % compare correlation coefficients with variance estimated in
             % each bin or globally
@@ -36,9 +127,9 @@ classdef plots
                 V = reshape(nanvar(reshape(X,[],nCells)), 1,1,1,nCells);
                 c1 = getCorr(X,V);
                 
-%                 % method 2: condition-specific variance
-%                 V = reshape(nanvar(reshape(permute(X, [1 3 2 4]),[],nConds,nCells)), 1,nConds,1,nCells);
-%                 c2 = getCorr(X,V);
+                %                 % method 2: condition-specific variance
+                %                 V = reshape(nanvar(reshape(permute(X, [1 3 2 4]),[],nConds,nCells)), 1,nConds,1,nCells);
+                %                 c2 = getCorr(X,V);
                 
                 % method 3: bin-specific variance
                 if size(X,1)<=evokedBins
@@ -111,7 +202,7 @@ classdef plots
                 set(gca,'XTick',0:length(lowerLimits)-1,'XTickLabel',lowerLimits), grid on, xlim([0 length(lowerLimits)])
                 xlabel 'distance (\mum)'
                 
-                                
+                
                 set(gcf,'PaperSize',[12 12],'PaperPosition',[0 0 12 12])
                 print('-dpng','-r400', sprintf('~/dev/temp/corrComp5-%04d',mod(key.aod_scan_start_time,1e4)))
             end
