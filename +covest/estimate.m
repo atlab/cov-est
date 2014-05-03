@@ -28,7 +28,6 @@ X = bsxfun(@minus, X, M);
 X = reshape(X,[],nCells);
 X = X(~any(isnan(X),2),:);
 
-
 switch covEstimation
     case 'sample'
         assert(isempty(hypers),'invalid hyperparameters')
@@ -52,13 +51,13 @@ switch covEstimation
     case 'glasso'
         assert(length(hypers)==2)
         C = covest.lib.cov(X);
-        C = hypers(1)*mean(diag(C))*eye(size(C)) + (1-hypers(1))*C; 
+        C = hypers(1)*mean(diag(C))*eye(size(C)) + (1-hypers(1))*C;
         
         scale = mean(diag(C));
         C = C/scale;
         alpha = hypers(2);
         beta = 10;
-        extras = covest.lib.lvglasso(C,alpha,beta,struct('refit',true,'max_latent',0));
+        extras = covest.lib.lvglasso(C,alpha,beta,struct('refit',false,'max_latent',0));
         extras.S = extras.S/scale;  % scale back
         C = inv(extras.S);
         
@@ -72,7 +71,7 @@ switch covEstimation
         C = C/scale;
         alpha = hypers(2);
         beta = hypers(3);
-        extras = covest.lib.lvglasso(C,alpha,beta,struct('refit',true));
+        extras = covest.lib.lvglasso(C,alpha,beta,struct('refit',false));
         extras.S = extras.S/scale;  % scale back
         extras.L = extras.L/scale;
         [H,D] = svds(extras.L,sum(~~extras.eigL));

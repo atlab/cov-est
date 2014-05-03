@@ -5,78 +5,50 @@ classdef plots
     
     properties(Constant)
         figPath = '~/cov/figures/src/'
+        exampleSite = 'mod(aod_scan_start_time,10000)=4328 && high_repeats'
     end
     
     methods(Static)
         
         function fig3
             
-            useQuad = false;
-            
-            if useQuad
-                fname = 'comparison-quad';
-                pairs = {
-                    };
-            else
-                fname = 'comparison';
-                pairs = [
-                    10  0  .09  .05
-                    30  0  .09  .05
-                    40  0  .09  .05
-                    70  0  .09  .05
-                    
-                    30 10  .015  .01
-                    40 10  .015  .01
-                    70 10  .015  .01
-                    
-                    40 30  .015  .01
-                    70 30  .015  .01
-                    
-                    70 40  .015  .01
-                    ];
-            end
-            nbins = 24;
+            pairs = {
+                0   90    'sample'
+                10  90    'diag'
+                30  90    'factor'
+                80  90    'sparse'
+                };
+            pairs = flipud(pairs);
             
             c = covest.CovMatrix & 'nfolds>1';
             c1 = pro(c, 'method->m1','cv_loss->l1');
             c2 = pro(c, 'method->m2','cv_loss->l2');
             
-            for i=1:size(pairs,1)
-                r = struct('m1',pairs(i,1),'m2',pairs(i,2));
-                %[l1,l2] = fetchn(c1*c2 & r, 'l1', 'l2');
-                [l1,l2] = fetchn(covest.ActiveCells, c1*c2 & r, 'avg(l1)->ll1','avg(l2)->ll2');
-                
-                fig = Figure(1, 'size', [40 30]);
-                rr = pairs(i,3);
-                bins = linspace(-rr,rr,nbins);
-                x = l2-l1;
-                %                xarrow = fetch1(r & arrowKey, 'l1-l2->d');
-                a = hist(min(1,x),bins);
-                bar(bins,a)
-                p = signrank(x);
-                fprintf('%2d-%2d Significance %1.0e, median difference = %g\n', ...
-                                     pairs(i,2),pairs(i,1),p, median(x))
-                xlim([-1 1]*rr*(1+1.1/nbins))
-                ylim([-.5 14])
-                hold on
-                plot([0 0], ylim,'k')
-                plot([0 0]+median(x), ylim, ':','Color',[.6 0 0])
-                hold off
-                box off
-                set(gca, 'YColor',[1 1 1]*0.99,'YTick',[])
-                ticks = (-1:1)*pairs(i,4);
-                colormap gray
-                
-                set(gca,'XTick',ticks,'XTickLabel',nozero(ticks))
-                set(gca,'YTick',10)
-                set(gca,'Position', [.05    .2    .8    .8])
-                hold on
-                PlotAxisAtOrigin([1 1])
-                hold off
-                
-                fig.cleanup
-                fig.save(fullfile(covest.plots.figPath,sprintf('%s-%02d-vs-%02d.eps',fname,pairs(i,1),pairs(i,2))))
-            end
+            x = arrayfun(@(i) ...
+                fetchn(covest.ActiveCells, c1*c2 & sprintf('m1=%d and m2=%d',pairs{i,1:2}),...
+                'avg(l1)-avg(l2)->diff'),...
+                1:size(pairs,1), 'uni', false);
+            x = [x{:}];
+            
+            fprintf('Medians:%s\n', sprintf(' %1.2e',median(x)))
+            p = arrayfun(@(i) signrank(x(:,i)), 1:size(x,2));
+            fprintf('p-values: %s\n', sprintf(' %1.1e',p))
+            fig = Figure(1, 'size', [163 35]);
+            h = boxplot(x,'jitter',0,'colors','k',...
+                'labels',pairs(:,3),'orientation','horizontal','outliersize',3);
+            set(h(1:2,:),'LineStyle','-','LineWidth',.25)
+            set(h(7,:),'MarkerEdgeColor','k')
+            xlabel 'nats/cell/bin'
+            ticks = 0:0.01:.1;
+            set(gca,'XTick',ticks,'XTickLabel',nozero(ticks))
+            set(gca,'YColor',[1 1 1])
+            hold on
+            plot([0 0],ylim,'k:')
+            hold off
+            axis tight
+            set(gca,'Position',[.08 .3 0.90 0.7])
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath, 'Fig3.eps'))
             
             function s=nozero(f)
                 % remove leading zeros in decimal fractions
@@ -94,149 +66,227 @@ classdef plots
         end
         
         
-        
-        function compareCorrMethods
-            % compare correlation coefficients with variance estimated in
-            % each bin or globally
+        function fig4
+            select = [covest.plots.exampleSite ' && nfolds=1'];
+            C0 = fetch1(covest.CovMatrix & select & 'method=0','cov_matrix');
+            [C1,S,L] = fetch1(covest.CovMatrix & select & 'method=90','cov_matrix','sparse','lowrank');
+            p = size(C0,1);
+            CC0 = corrcov(C0);
             
-            for key = fetch(covest.ActiveCells & 'preprocess_method_num=5' & 'high_repeats')'
-                clf
-                [X,evokedBins,sel,xyz] = fetch1(covest.ActiveCells*covest.Traces & key, ...
-                    'trace_segments','evoked_bins', 'selection', 'cell_xyz');
-                evokedBins = min(evokedBins,size(X,1));
-                
-                % compare with original binned traces
-                %X = X(1:min(end,evokedBins),:,:,sel);
-                X = X(:,:,:,sel);
-                
-                [nBins,nConds,nTrials,nCells] = size(X);
-                
-                % subtract mean response
-                if size(X,1)<=evokedBins
-                    M = nanmean(X,3);
-                else
-                    M1 = nanmean(X(1:evokedBins,:,:,:),3);   % binwise mean of evoked response
-                    M2 = reshape(nanmean(reshape(X(evokedBins+1:end,:,:,:),[],nCells)),1,1,1,nCells);  % common mean in intertrial periods
-                    M2 = repmat(M2,size(X,1)-evokedBins,nConds);
-                    M = cat(1,M1,M2);
+            fprintf('sparsity: %2.1f%%, avg node degree = %3.2f, low-rank=%d\n', ...
+                covest.lib.sparsity(S)*100, covest.lib.nodeDegree(S), size(L,2))
+            
+            % correlation matrix: sample / regularized
+            comboPlot(CC0,corrcov(C1),fullfile(covest.plots.figPath, 'Fig4-A.eps'))
+            densityPlot(corrcov(C0),corrcov(C1),fullfile(covest.plots.figPath,'Fig4-B'))
+            
+            % partial correlation matrix: sample / regularized
+            iC0 = -corrcov(inv(C0));
+            iC0 = (~eye(p)).*iC0;
+            iC = inv(C1);
+            %ds = diag(sqrt(diag(iC)));
+            ds = diag(sqrt(diag(S)));
+            iC = -(~eye(p)).*(ds\iC/ds);
+            
+            % partial correlation matrix: sample / regularized
+            comboPlot(iC0,iC,fullfile(covest.plots.figPath, 'Fig4-C.eps'))
+            densityPlot(iC0,iC,fullfile(covest.plots.figPath, 'Fig4-D'))
+            % replace interaction matrix with thresholded correlations
+            
+            comboPlot(-ds\S/ds,ds\L*L'/ds,...
+                fullfile(covest.plots.figPath, 'Fig4-E.eps'))
+            densityPlot(CC0,-ds\S/ds,...
+                fullfile(covest.plots.figPath, 'Fig4-F'),[0 0.2],true)
+            
+            
+            
+            function densityPlot(C1,C2,filename,axisAlphas,threshold)
+                if nargin<4
+                    axisAlphas=[.2 .2];
                 end
-                
-                X = bsxfun(@minus, X, M);
-                
-                % method 1: common variance
-                V = reshape(nanvar(reshape(X,[],nCells)), 1,1,1,nCells);
-                c1 = getCorr(X,V);
-                
-                %                 % method 2: condition-specific variance
-                %                 V = reshape(nanvar(reshape(permute(X, [1 3 2 4]),[],nConds,nCells)), 1,nConds,1,nCells);
-                %                 c2 = getCorr(X,V);
-                
-                % method 3: bin-specific variance
-                if size(X,1)<=evokedBins
-                    V = nanvar(X,[],3);
-                else
-                    V1 = nanvar(X(1:evokedBins,:,:,:),[],3);   % binwise mean of evoked response
-                    V2 = reshape(nanvar(reshape(X(evokedBins+1:end,:,:,:),[],nCells)),1,1,1,nCells);  % common mean in intertrial periods
-                    V2 = repmat(V2,size(X,1)-evokedBins,nConds);
-                    V = cat(1,V1,V2);
+                rng = 0.1;
+                ctrs = linspace(-rng*0.8,rng*1.8,200);
+                pp = size(C1,1);
+                [i,j] = ndgrid(1:pp,1:pp);
+                I = hist3([C2(i<j) C1(i<j)],{ctrs ctrs});
+                cmap=[[1 1 1];jet(100)];
+                I = reshape(cmap(min(end,I+1),:), [size(I) 3]);
+                if nargin>=5
+                    threshold = quantile(abs(C1(i>j)),covest.lib.sparsity(C2));
+                    temp = I(:,abs(ctrs)<threshold,:);
+                    temp(repmat(all(temp==1,3),1,1,3)) = .8;
+                    I(:,abs(ctrs)<threshold,:) = temp;
                 end
-                c3 = getCorr(X,V);
-                
-                
-                cc1 = c1;
-                cc2 = c3;
-                clear c0 c1 c2 c3
-                
-                
-                subplot 431, imagesc(cc1,[-1 1]*.2), axis image off, title 'common variance'
-                colorbar
-                subplot 432, imagesc(cc2,[-1 1]*.2), axis image off, title 'binned variance'
-                colorbar
-                colormap(covest.lib.doppler)
-                
-                n = size(cc1,1);
-                [i,j] = meshgrid(1:n,1:n);
-                cc1 = cc1(i<j);
-                cc2 = cc2(i<j);
-                mm1 = mean(cc1);
-                mm2 = mean(cc2);
-                
-                r = [-.1 .3];
-                subplot 434, hist(cc1,linspace(r(1),r(2),100)), xlim(r), ylim_ =ylim; xlabel correlations, hold on, plot(mm1*[1 1],ylim_,'r'), hold off, grid on
-                subplot 435, hist(cc2,linspace(r(1),r(2),100)), xlim(r), ylim(ylim_), xlabel correlations, hold on, plot(mm2*[1 1],ylim_,'r'), hold off, grid on
-                
-                ix = linspace(r(1)/2,r(2)/2,50);
-                
-                subplot (4,3,[3 6]), densityPlot(ix, ix, cc1, cc2), xlabel 'common variance', ylabel 'binned variance'
-                hold on, plot(mm1,mm2,'r+','MarkerSize',40), set(refline(1),'Color','r'), hold off
-                
-                if count(covest.OriTuning & setfield(key,'high_repeats',0)) %#ok<SFLD>
-                    [ori,p] = fetch1(covest.OriTuning & setfield(key,'high_repeats',0), 'von_pref','von_p_value'); %#ok<SFLD>
-                    ori(p<0.05) = nan;
-                    ori = ori(sel)*180/pi;
-                    [ori1,ori2] = meshgrid(ori,ori);
-                    oDiff = oriDiff(ori1(i<j),ori2(i<j));
-                    lowerLimits = [0 15 45];
-                    
-                    bins = sum(bsxfun(@ge, oDiff(~isnan(oDiff)), lowerLimits),2);
-                    meanCorrs1 = accumarray(bins, cc1(~isnan(oDiff)), size(lowerLimits'), @mean);
-                    meanCorrs2 = accumarray(bins, cc2(~isnan(oDiff)), size(lowerLimits'), @mean);
-                    
-                    subplot 437, bar(0.5:length(lowerLimits), meanCorrs1), ylim_=ylim*1.2;  ylim([0 ylim_(2)])
-                    set(gca,'XTick',0:length(lowerLimits),'XTickLabel',[lowerLimits 90]), grid on, xlim([0 length(lowerLimits)])
-                    subplot 438, bar(0.5:length(lowerLimits), meanCorrs2), ylim([0 ylim_(2)])
-                    set(gca,'XTick',0:length(lowerLimits),'XTickLabel',[lowerLimits 90]), grid on, xlim([0 length(lowerLimits)])
-                    xlabel '\DeltaOri (degrees)'
-                end
-                
-                dist = arrayfun(@(i,j) norm(xyz(i,:)-xyz(j,:)), i,j);
-                dist = dist(i<j);
-                lowerLimits = [0 25 75 150];
-                bins = sum(bsxfun(@ge, dist, lowerLimits),2);
-                meanCorrs1 = accumarray(bins, cc1, size(lowerLimits'), @mean);
-                meanCorrs2 = accumarray(bins, cc2, size(lowerLimits'), @mean);
-                
-                subplot(4,3,10), bar(0.5:length(lowerLimits), meanCorrs1), ylim_=ylim*1.2; ylim([0 ylim_(2)])
-                set(gca,'XTick',0:length(lowerLimits)-1,'XTickLabel',lowerLimits), grid on, xlim([0 length(lowerLimits)])
-                subplot(4,3,11), bar(0.5:length(lowerLimits), meanCorrs2), ylim([0 ylim_(2)])
-                set(gca,'XTick',0:length(lowerLimits)-1,'XTickLabel',lowerLimits), grid on, xlim([0 length(lowerLimits)])
-                xlabel 'distance (\mum)'
-                
-                
-                set(gcf,'PaperSize',[12 12],'PaperPosition',[0 0 12 12])
-                print('-dpng','-r400', sprintf('~/dev/temp/corrComp5-%04d',mod(key.aod_scan_start_time,1e4)))
+                image(ctrs,ctrs,I)
+                set(gca,'XTick',rng,'YTick',rng)
+                set(refline(1,0),'Color','r','LineWidth',.5)
+                set(gca,'Position',[0.04 0.04 0.92 0.92])
+                axis xy
+                axis square
+                hold on
+                PlotAxisAtOrigin(axisAlphas)
+                hold off
+                set(gcf,'PaperUnits','centimeters','PaperPosition',[0 0 3.5 3.5],...
+                    'PaperSize',[3.5 3.5])
+                print('-dpng','-r800',filename)
             end
             
-            
-            function c = getCorr(X,V)
-                z = reshape(bsxfun(@rdivide,X,sqrt(V+eps)),[],size(X,4));
-                c = corrcov(nancov(z));
+            function comboPlot(C1,C2,filename)
+                fig = Figure(1,'size',[50 46]);
+                d = 8;  % zoom factor for plotting matrices
+                pp = size(C1,1);
+                [i,j] = ndgrid(1:pp,1:pp);
+                gap = 15;
+                C = zeros(size(C1)+[0 gap]);
+                C(:,1:pp) = C(:,1:pp) + C1.*(i>j);
+                C(:,(1:pp)+gap) = C(:,(1:pp)+gap) + C2.*(i<j);
+                imagesc(0:pp+gap+1,0:pp+1,...
+                    imresize(C,d,'nearest'), .1*[-1 1])
+                axis image
+                colormap(covest.lib.doppler)
+                set(gca,'YTick',[1 pp],'XTick',[])
+                pos = [.14 .03 .85 .945];
+                set(gca,'Position',pos)
+                line([0 pp+1]+.5,[0 pp+1],'Color','k','LineWidth',.25)
+                line([0 pp+1]+gap-.5,[0 pp+1],'Color','k','LineWidth',.25)
+                fig.cleanup
+                box on
+                fig.save(filename)
             end
             
         end
         
+        
+        function network
+            clf
+
+            doFragment = false;  % when, true plot only the inner fragment
+            doCorr = false; % when true, plot thresholded correlations in the fragment
+            doFragment = doFragment || doCorr;
+            
+            % figure 4-G,H,I
+            alpha = 0.05;  % tuning signficance levels
+            zref = 200;  % cortical depth of the center of the scan
+            xoffset = -30;
+            yoffset = -26;
+            zoffset = 22;
+
+            zticks = 100:50:300;
+            xticks = -200:50:200;
+            yticks = -200:50:200;
+            zm = .60;
+            panx = 1.3;
+            pany = 0;
+            alphaMultiplier = 3.0*(1+doFragment);
+
+            scanNum = fetch1(covest.Traces & covest.plots.exampleSite, 'mod(aod_scan_start_time,10000)->scannum');
+            fname = fullfile(covest.plots.figPath,sprintf('network%04d',scanNum));
+
+            if doFragment
+                fragmentRadius = 48;
+                paperSize = [6.5 5.0];
+                lineWidth = 1;
+                zm = 0.7;
+                panx = -2.5;
+            else
+                fragmentRadius = inf;
+                paperSize = [12 11];
+                lineWidth = .25;
+            end
+            
+            % get cell positions, tuning, and sparse interactions
+            key = fetch(covest.CovMatrix & covest.plots.exampleSite & 'method=90' & 'nfolds=1');
+            assert(isscalar(key))
+            xyz = fetch1(covest.Traces & key & 'high_repeats','cell_xyz');
+            selection = fetch1(covest.ActiveCells & key, 'selection');
+            [ori,pval] = fetch1(covest.OriTuning & rmfield(key,'high_repeats'), 'von_pref','von_p_value');
+            [S,L] = fetch1(covest.CovMatrix & key, 'sparse', 'lowrank');
+            S = -corrcov(S);  % convert to partial correlations
+
+            % thresholded correlations
+            C0= corrcov(fetch1(covest.CovMatrix & setfield(key, 'method', 0), 'cov_matrix')); %#ok<SFLD>
+            sparsity = fetch1(covest.CovMatrix & key, 'sparsity');
+            p = size(C0,1);
+            [i,j] = ndgrid(1:p,1:p);
+            C0 = C0.*(abs(C0)>quantile(abs(C0(i<j)), sparsity));
+            
+            % report everything
+            fprintf('Ssparsity = %2.1f%%\n', 100*sparsity)
+            fprintf('Overlap = %2.1f%%\n',  100*sum(C0(i<j) & S(i<j))/sum(~~S(i<j)))
+            fprintf('Latent = %d\n', size(L,2));
+            fprintf('Negative interactions = %2.1f%%\n', 100*sum(S(i<j)<0)/sum(~~S(i<j)))
+            
+            if doCorr
+                S = C0;
+                fname = fullfile(covest.plots.figPath,sprintf('network-corr%04d',scanNum));
+            elseif doFragment
+                fname = fullfile(covest.plots.figPath,sprintf('network-frag%04d',scanNum));
+            end
+                        
+            x = xyz(:,1);
+            y = xyz(:,2);
+            z = xyz(:,3)+zref;
+            
+            % plot balls
+            hue = mod(ori(:)/pi,1);
+            sat = pval(:)<alpha;
+            val = (1-.2*(pval(:)>=alpha)).*selection(:);
+            color = hsv2rgb([hue sat val]);
+            clear hue sat val
+            
+            fragIdx = (x-xoffset).^2+(y-yoffset).^2+(z-zref-zoffset).^2 < fragmentRadius^2;
+            
+            scatter3sph(x(fragIdx),y(fragIdx),z(fragIdx),'siz',3,'col',color(fragIdx,:))
+            light('Position',[0.5 0.5 1],'Style','infinit','Color',[1 1 1])
+            lighting gouraud
+            axis vis3d
+            axis equal
+            set(gca,'ZDir','reverse')
+            camproj perspective
+            grid on
+            
+            % show interactions
+            x = x(selection);
+            y = y(selection);
+            z = z(selection);
+            
+            if doFragment
+                fragIdx = (x-xoffset).^2+(y-yoffset).^2+(z-zref-zoffset).^2 < fragmentRadius^2;
+                x = x(fragIdx);
+                y = y(fragIdx);
+                z = z(fragIdx);
+                S = S(fragIdx,fragIdx);
+            end
+
+            
+            [i,j] = ndgrid(1:size(S,1),1:size(S,2));
+            
+            % positive interactions
+            ix = find(j(:)>i(:) & S(:)>0);
+            for ix = ix'
+                lineAlpha = min(1,(alphaMultiplier*1*abs(S(ix))));
+                patch([x(i(ix)) x(j(ix))],[y(i(ix)) y(j(ix))], [z(i(ix)) z(j(ix))], [0 0], ...
+                    'EdgeColor',[0 1 0]/2,'EdgeAlpha',lineAlpha,'LineWidth',lineWidth,'FaceColor','none')
+            end
+            
+            % negative interactions
+            ix = find(j(:)>i(:) & S(:)<0);
+            for ix = ix'
+                lineAlpha = min(1,(alphaMultiplier*4.0*abs(S(ix))));
+                patch([x(i(ix)) x(j(ix))],[y(i(ix)) y(j(ix))], [z(i(ix)) z(j(ix))], [0 0], ...
+                    'EdgeColor',[1 0 0]/2,'EdgeAlpha',lineAlpha,'LineWidth',lineWidth,'FaceColor','none')
+            end
+            view(25-90, 65)
+            zoom(zm)
+            camPos = get(gca,'CameraPosition');
+            set(gca,'CameraPosition',camPos*0.5)
+            set(gca,'ZTick',zticks)
+            set(gca,'XTick',xticks,'YTick',yticks)
+            campan(panx,pany)
+            set(gca,'fontsize',8,'linewidth',0.25,'TickLength',get(gca,'TickLength')*0.75)
+            
+            set(gcf,'PaperUnits','centimeters','PaperSize',paperSize,'PaperPosition',[0 0 paperSize])
+            print('-dpdf','-r800',fname)
+        end
     end
-end
-
-
-function densityPlot(x,y,c1,c2)
-img = hist3([c2 c1],{x,y});
-img = 255*img/max(img(:));
-cmap = [1 1 1; jet(255)];
-%(1-bsxfun(@power, gray(256), [.2 .3 .4])
-subimage(x, y, img, cmap)
-set(gca,'YDir','normal')
-grid on
-end
-
-
-function d=oriDiff(ori1,ori2)
-% compute the absolute difference between orientations ori1 and ori2 (in degrees)
-ori1 = mod(ori1, 180);
-ori2 = mod(ori2, 180);
-b1 = min(ori1,ori2);
-b2 = max(ori1,ori2);
-d = min(b2-b1,b1+180-b2);
-d(isnan(ori1))=nan;
-d(isnan(ori2))=nan;
 end

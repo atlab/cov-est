@@ -1,20 +1,21 @@
 %{
 covest.CovMatrix (computed) # regularized correlation matrix estimates
 -> covest.ActiveCells
--> covest.Method              # method for computing correlation matrices
+-> covest.Method
 -> covest.Fold
------
-cov_matrix                   : longblob                      # estimated covariance matrix
-sparse = null                : longblob                      # sparse component of the matrix
-lowrank = null               : longblob                      # low-rank component of matrix
-hypers = null                : blob                          # values of hyperparameters
-visited = null               : longblob                      # tested hyperparamter values
-losses  = null               : longblob                      # losses for tested hyperparameter values
-sparsity = 0                 : float                         # fraction of zeros off-diagonal
-cv_loss = null               : double                        # cross-validation loss
-host                         : varchar(255)                  # computer that did the job
-computing_time               : float                         # (s) time required to compute
-cm_ts = CURRENT_TIMESTAMP   : timestamp
+---
+cov_matrix                  : longblob                      # estimated covariance matrix
+test_matrix=null            : longblob                      # sample cov matrix from the testing set
+sparse=null                 : longblob                      # sparse component of the matrix
+lowrank=null                : longblob                      # low-rank component of matrix
+hypers=null                 : blob                          # values of hyperparameters
+visited=null                : longblob                      # tested hyperparamter values
+losses=null                 : longblob                      # losses for tested hyperparameter values
+sparsity=0                  : float                         # fraction of zeros off-diagonal
+cv_loss=null                : double                        # cross-validation loss
+host                        : varchar(255)                  # computer that did the job
+computing_time              : float                         # (s) time required to compute
+cm_ts=CURRENT_TIMESTAMP     : timestamp                     # 
 %}
 
 classdef CovMatrix < dj.Relvar & dj.AutoPopulate
@@ -62,6 +63,7 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             key.cov_matrix = C;
             if ~isempty(XTest)
                 CTest = covest.estimate(XTest,[],evokedBins, 'sample', {});
+                key.test_matrix = CTest;
                 key.cv_loss = loss(C,CTest);
             end
             if ~isempty(hypers)
