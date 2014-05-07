@@ -22,7 +22,7 @@ K = 10;  % K-fold cross-validation
 
 % coarse random search to seed the local search
 fprintf 'random search: '
-decimate = 10;
+decimate = 6;
 nRandom = ceil(prod(max(1,dims/decimate)/sum(dims>1)));
 fprintf('%d points\n', nRandom)
 ix = arrayfun(@(~) arrayfun(@(d) randi(d), dims), 1:nRandom, 'uni', false);

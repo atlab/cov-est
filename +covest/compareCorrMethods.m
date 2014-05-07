@@ -75,7 +75,7 @@ for key = fetch(covest.ActiveCells & 'preprocess_method_num=5' & 'high_repeats')
     
     if count(covest.OriTuning & setfield(key,'high_repeats',0)) %#ok<SFLD>
         [ori,p] = fetch1(covest.OriTuning & setfield(key,'high_repeats',0), 'von_pref','von_p_value'); %#ok<SFLD>
-        ori(p<0.05) = nan;
+        ori(p>0.05) = nan;
         ori = ori(sel)*180/pi;
         [ori1,ori2] = meshgrid(ori,ori);
         oDiff = oriDiff(ori1(i<j),ori2(i<j));

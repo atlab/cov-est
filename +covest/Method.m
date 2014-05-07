@@ -24,6 +24,7 @@ classdef Method < dj.Relvar
             10  1 0  'diag'  loss  {exp(-5:0.05:0),exp(-10:0.05:0)}
             11  0 0  'diag'  loss  {exp(-5:0.05:0),exp(-10:0.05:0)}
             
+            19  1 0  'factor'  loss  {0:70,exp(-5:0.05:0),0}
             20  1 0  'factor'  loss  {0:70,1,0}
             30  1 0  'factor'  loss  {0:70,1,exp(-6:0.05:0)}
             31  0 0  'factor'  loss  {0:70,1,exp(-6:0.05:0)}
@@ -41,6 +42,9 @@ classdef Method < dj.Relvar
             73  0 2  'lv-glasso' loss {0,exp(-6:.05:0),exp(-6:.1:1)}
             
             80  1 0  'glasso'  loss  {0,exp(-6:0.05:0)}
+            81  1 0  'glasso'  loss  {0,exp(-6:0.05:0)}
+            82  1 0  'glasso'  loss  {0,exp(-6:0.05:0)}
+            83  1 0  'glasso'  loss  {0,exp(-6:0.05:0)}
             
             90  1 0  'lv-glasso' loss {0,exp(-6:.05:0),exp(-6:.1:1)}
             91  0 0  'lv-glasso' loss {0,exp(-6:.05:0),exp(-6:.1:1)}
