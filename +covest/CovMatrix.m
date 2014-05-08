@@ -50,19 +50,19 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             end
             
             % split into training and testing
-            [X, XTest] = covest.splitTrials(X,k,nFolds);
+            [X, XTest] = cove.splitTrials(X,k,nFolds);
             
             % estimate hyperparameters (if any)
             hypers = {};
             if ~isempty(opt.hyperparam_space)
-                [hypers, key.visited, key.losses] = covest.crossEstimateHyper(X, evokedBins, loss, ...
+                [hypers, key.visited, key.losses] = cove.crossEstimateHyper(X, evokedBins, loss, ...
                     opt.regularization, opt.hyperparam_space);
             end
-            [C,~,extras] = covest.estimate(X, [], evokedBins, opt.regularization, hypers);
+            [C,~,extras] = cove.estimate(X, [], evokedBins, opt.regularization, hypers);
             
             key.cov_matrix = C;
             if ~isempty(XTest)
-                CTest = covest.estimate(XTest,[],evokedBins, 'sample', {});
+                CTest = cove.estimate(XTest,[],evokedBins, 'sample', {});
                 key.test_matrix = CTest;
                 key.cv_loss = loss(C,CTest);
             end
@@ -77,7 +77,7 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
                     key.lowrank = extras.H;
                 end
                 if isfield(extras,'S')
-                    key.sparsity = covest.lib.sparsity(extras.S);
+                    key.sparsity = cove.sparsity(extras.S);
                     key.sparse = extras.S;
                 end
             end

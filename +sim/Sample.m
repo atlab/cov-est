@@ -1,31 +1,28 @@
 %{
-sim.Sample (computed) # my newest table
--> sim.TrueCov
+sim.Sample (computed) # random sample
+-> sim.Truth
 -> sim.SampleSize
--> sim.Seed
----
-sample_covmatrix            : longblob                      # sample covariance matrix
+sample_seed  : tinyint
+-----
+sample_data  :  longblob    # raw data
 %}
 
 classdef Sample < dj.Relvar & dj.AutoPopulate
     
     properties
-        popRel = sim.TrueCov * sim.SampleSize * sim.Seed
+        popRel = sim.Truth*sim.SampleSize
     end
     
     methods(Access=protected)
         function makeTuples(self, key)
-            Sigma = fetch1(sim.TrueCov & key, 'covmatrix');
-            X = sim.Sample.makeSample(key.seed, key.sample_size, Sigma);
-            key.sample_covmatrix = covest.cov(X);
+            sampleSeed = 1;
+            rng(sampleSeed)
+            n = fetch1(sim.SampleSize & key, 'sample_size');
+            C = fetch1(sim.Truth & key, 'true_cov');
+            key.sample_seed = sampleSeed;
+            key.sample_data = single(mvnrnd(zeros(size(C,1),1),C,n));
             self.insert(key)
         end
     end
     
-    methods(Static)
-        function X = makeSample(seed,sampleSize,Sigma)
-            rng(seed)
-            X = mvnrnd(zeros(size(Sigma,1),1),Sigma,sampleSize);
-        end
-    end
 end

@@ -12,7 +12,7 @@ hyperparam_space            : longblob                      # arrays of hyperpar
 classdef Method < dj.Relvar
     methods
         function fill(self)
-            loss =  '@(S,Sigma)(trace(Sigma/S)+covest.lib.logDet(S))/size(S,1)';
+            loss =  '@(S,Sigma)(trace(Sigma/S)+cove.logDet(S))/size(S,1)';
             
             self.inserti({
                 

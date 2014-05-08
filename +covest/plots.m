@@ -22,12 +22,12 @@ classdef plots
             dirs = cellfun(@(dirs,selection) dirs(selection)/pi*180, dirs, selection, 'uni', false);
             pval = cellfun(@(pval,selection) pval(selection), pval, selection, 'uni', false);
             if ~doCorrs
-            d =[ 
-                cellfun(@(S,dirs,pval) ndegree(S,dirs,pval,90), S1, dirs, pval)'
-                cellfun(@(S,dirs,pval) ndegree(S,dirs,pval, 0), S1, dirs, pval)'
-                cellfun(@(S,dirs,pval) ndegree(S,dirs,pval,90), S2, dirs, pval)'
-                cellfun(@(S,dirs,pval) ndegree(S,dirs,pval, 0), S2, dirs, pval)'
-                ];
+                d =[
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval,90), S1, dirs, pval)'
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval, 0), S1, dirs, pval)'
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval,90), S2, dirs, pval)'
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval, 0), S2, dirs, pval)'
+                    ];
             else
                 d =[
                     cellfun(@(C,dirs,pval) avgCorr(C,dirs,pval,90), C1, dirs, pval)'
@@ -50,16 +50,22 @@ classdef plots
                 fig.save(fullfile(covest.plots.figPath,'supp3-B.eps'))
             end
             
-            function n = ndegree(S,dirs,pval,filt)
-                ix = pval < 0.05 & oriDiff(filt,dirs') < 45;
-                n = (1-covest.lib.sparsity(S(ix,ix)))/(1+sqrt(eps)-covest.lib.sparsity(S));          
+            function ret = ndegree(S,dirs,pval,filt)
+                ix = pval < 0.01 & oriDiff(filt,dirs') < 40;
+                if sum(ix)<10
+                    ret = nan;
+                else
+                    ret = (1-cove.sparsity(S(ix,ix)))/(1-cove.sparsity(S));  
+                end
             end
             
-            function n = avgCorr(C,dirs,pval,filt)
-                ix = pval < 0.05 & oriDiff(filt,dirs') < 45;
-                avgC = mean(offDiag(C));
-                C = C(ix,ix);
-                n = mean(offDiag(C))/avgC;
+            function ret = avgCorr(C,dirs,pval,filt)
+                ix = pval < 0.01 & oriDiff(filt,dirs') < 40;
+                if sum(ix)<10
+                    ret = nan;
+                else
+                    ret = cove.avgCorr(C(ix,ix));%/cove.avgCorr(C);
+                end
             end
             
         end
@@ -81,7 +87,7 @@ classdef plots
             p = size(C,1);
             C = corrcov(C);
             imagesc(C,.1*[-1 1]);
-            colormap(covest.lib.doppler)
+            colormap(cove.doppler)
             axis image
             set(gca,'YTick',[1 p],'XTick',[])
             set(gca, 'Position', [0.20 0.04 0.795 0.89]);
@@ -183,7 +189,7 @@ classdef plots
             CC0 = corrcov(C0);
             
             fprintf('sparsity: %2.1f%%, avg node degree = %3.2f, low-rank=%d\n', ...
-                covest.lib.sparsity(S)*100, covest.lib.nodeDegree(S), size(L,2))
+                cove.sparsity(S)*100, cove.nodeDegree(S), size(L,2))
             
             % correlation matrix: sample / regularized
             comboPlot(CC0,corrcov(C1),fullfile(covest.plots.figPath, 'Fig4-A.eps'))
@@ -221,7 +227,7 @@ classdef plots
                 cmap=[[1 1 1];jet(100)];
                 I = reshape(cmap(min(end,I+1),:), [size(I) 3]);
                 if nargin>=5
-                    threshold = quantile(abs(C1(i>j)),covest.lib.sparsity(C2));
+                    threshold = quantile(abs(C1(i>j)),cove.sparsity(C2));
                     temp = I(:,abs(ctrs)<threshold,:);
                     temp(repmat(all(temp==1,3),1,1,3)) = .8;
                     I(:,abs(ctrs)<threshold,:) = temp;
@@ -252,7 +258,7 @@ classdef plots
                 imagesc(0:pp+gap+1,0:pp+1,...
                     imresize(C,d,'nearest'), .1*[-1 1])
                 axis image
-                colormap(covest.lib.doppler)
+                colormap(cove.doppler)
                 set(gca,'YTick',[1 pp],'XTick',[])
                 pos = [.14 .03 .85 .945];
                 set(gca,'Position',pos)
@@ -435,7 +441,7 @@ classdef plots
             fname = fullfile(covest.plots.figPath, 'Fig5-B.eps');
             fig = Figure(1,'size',[40 40]);
             
-            nodeDegree = cellfun(@covest.lib.nodeDegree, S);
+            nodeDegree = cellfun(@cove.nodeDegree, S);
             scatter(nCells,nodeDegree,17,nCells,'filled')
             colormap(flipud(hot)/1.5)
             hold on, plot(nCells(hix),nodeDegree(hix),'bo')
@@ -473,8 +479,8 @@ classdef plots
             [C0,C1,S1,hix2] = fetchn(c0*c1 & 'm0=0' & 'm1=90', ...
                 'c1', 'c2', 'sparse', '(mod(aod_scan_start_time,10000)=4328)->highlight');
             hix2 = find(hix2);
-            m0 = cellfun(@covest.lib.avgCorr, C0);
-            m1 = -cellfun(@(C) covest.lib.avgCorr(inv(C)), C1);
+            m0 = cellfun(@cove.avgCorr, C0);
+            m1 = -cellfun(@(C) cove.avgCorr(inv(C)), C1);
             
             scatter(m0,m1,17,nCells,'filled')
             colormap(flipud(hot)/1.5)
@@ -499,7 +505,7 @@ classdef plots
             fig = Figure(1,'size',[40 40]);
             
             overlap = 100*cellfun(@getOverlap, C0, S1);
-            connectivity = 100*(1-cellfun(@covest.lib.sparsity, S1));
+            connectivity = 100*(1-cellfun(@cove.sparsity, S1));
             scatter(connectivity,overlap,17,nCells,'filled')
             colormap(flipud(hot)/1.5)
             hold on, plot(connectivity(hix2),overlap(hix2),'bo')
@@ -537,7 +543,7 @@ classdef plots
             function overlap = getOverlap(C,S)
                 p = size(C);
                 [i,j] = ndgrid(1:p,1:p);
-                thresh = quantile(abs(C(i<j)),covest.lib.sparsity(S));
+                thresh = quantile(abs(C(i<j)),cove.sparsity(S));
                 C = C.*(abs(C)>thresh);
                 overlap = sum(logical(C(i<j) & S(i<j)))/sum(logical(S(i<j)));
             end
