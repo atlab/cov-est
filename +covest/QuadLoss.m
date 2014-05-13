@@ -36,8 +36,8 @@ classdef QuadLoss < dj.Relvar & dj.AutoPopulate
             
             % split into training and testing
             C = fetch1(covest.CovMatrix & key, 'cov_matrix');
-            [~, XTest] = covest.splitTrials(X,k,nFolds);
-            CTest = covest.estimate(XTest,[],evokedBins, 'sample', {});
+            [~, XTest] = cove.splitTrials(X,k,nFolds);
+            CTest = cove.estimate(XTest,[],evokedBins, 'sample', {});
             key.quad_loss = loss(C,CTest);
             self.insert(key)
         end

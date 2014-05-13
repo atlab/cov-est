@@ -16,7 +16,7 @@ classdef Method < dj.Relvar
                 
             0   'sample'    loss  []
             10  'diag'      loss  {exp(-5:0.05:0),exp(-8:0.05:0)}
-            30  'factor'    loss  {0:20,1,exp(-6:0.02:0)}
+            30  'factor'    loss  {0:40,1,exp(-6:0.02:0)}
             80  'glasso'    loss  {0,exp(-6:0.05:0)}
             90  'lv-glasso' loss  {0,exp(-6:.05:0),exp(-6:.1:1)}
             

@@ -2,7 +2,7 @@
 sim.Sample (computed) # random sample
 -> sim.Truth
 -> sim.SampleSize
-sample_seed  : tinyint
+sample_seed  : smallint
 -----
 sample_data  :  longblob    # raw data
 %}
@@ -15,7 +15,8 @@ classdef Sample < dj.Relvar & dj.AutoPopulate
     
     methods(Access=protected)
         function makeTuples(self, key)
-            sampleSeed = 1;
+            sampleSeed = 32000;
+            assert(sampleSeed ~= fetch1(sim.Truth & key, 'truth_seed'))
             rng(sampleSeed)
             n = fetch1(sim.SampleSize & key, 'sample_size');
             C = fetch1(sim.Truth & key, 'true_cov');

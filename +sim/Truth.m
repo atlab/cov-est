@@ -5,8 +5,8 @@ truth           : smallint
 population_size             : smallint                      # number of neurons
 truth_seed                  : smallint                      # random number generate seed
 truth_type                  : enum('diag','factor','sparse','sparse+latent') #
-sparsity                    : double                        # sparsity of the sparse component 
-nfactors                    : smallint                      # rank of the low-rank component 
+sparsity                    : double                        # sparsity of the sparse component
+nfactors                    : smallint                      # rank of the low-rank component
 true_cov                    : longblob                      # true covariance matrix
 %}
 
@@ -19,8 +19,12 @@ classdef Truth < dj.Relvar
                 for seed = 1:30
                     % generate the seed matrix
                     rng(seed)
-                    V =  lognrnd(1,.25,50,1);  % variances
-                    X = mvnrnd(zeros(size(V))',diag(V),p*3);
+                    V =  lognrnd(1,.25,p,1);  % variances
+                    n = p*3;
+                    if strncmp(truthType{diag},'sparse',6)
+                        n = p*5;
+                    end
+                    X = mvnrnd(zeros(size(V))',diag(V),n);
                     C = cove.cov(X);
                     nFactors = p;
                     sparsity = 0;
@@ -28,7 +32,7 @@ classdef Truth < dj.Relvar
                     switch truthType{1}
                         case 'diag'
                             C = diag(diag(C));
-                        
+                            
                         case 'factor'
                             nFactors = 4;
                             [L,V] = cove.factor(C,nFactors);
@@ -36,18 +40,18 @@ classdef Truth < dj.Relvar
                             
                         case 'sparse'
                             nFactors = 0;
-                            res = cove.lvglasso(C,0.4,0.2,struct('refit',true,'max_latent',0));
+                            res = cove.lvglasso(C,0.2,1.0,struct('refit',true,'max_latent',nFactors));
                             sparsity = cove.sparsity(res.S);
                             C = inv(res.S);
-
+                            
                         case 'sparse+latent'
                             nFactors = 3;
-                            res = cove.lvglasso(C,0.4,0.1,struct('refit',true,'max_latent',nFactors));
+                            res = cove.lvglasso(C,0.2,0.1,struct('refit',true,'max_latent',nFactors));
                             sparsity = cove.sparsity(res.S);
                             nFactors = size(res.eigL,1);
                             C = inv(res.S-res.L);
                             
-                        otherwise 
+                        otherwise
                             error 'unknown truth type'
                     end
                     
