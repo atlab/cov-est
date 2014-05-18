@@ -58,11 +58,11 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
                 [hypers, key.visited, key.losses] = cove.crossEstimateHyper(X, evokedBins, loss, ...
                     opt.regularization, opt.hyperparam_space);
             end
-            [C,~,extras] = cove.estimate(X, [], evokedBins, opt.regularization, hypers);
+            [C,M,extras] = cove.estimate(X, [], evokedBins, opt.regularization, hypers);
             
             key.cov_matrix = C;
             if ~isempty(XTest)
-                CTest = cove.estimate(XTest,[],evokedBins, 'sample', {});
+                CTest = cove.estimate(XTest,M,evokedBins, 'sample', {});
                 key.test_matrix = CTest;
                 key.cv_loss = loss(C,CTest);
             end

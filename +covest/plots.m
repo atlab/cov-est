@@ -9,14 +9,135 @@ classdef plots
     end
     
     methods(Static)
-  
+        
+        
+        function cvSpace
+            loss = @(S,Sigma)(trace(Sigma/S)+cove.logDet(S))/size(S,1);
+            
+            
+            % X := nBins * nDirs * nTrials * nCells
+            [X,selection] = fetch1(covest.Traces*covest.ActiveCells & covest.plots.exampleSite, ...
+                'trace_segments', 'selection');
+            X = double(X(:,:,:,selection));
+            Xsaved = X;
+            
+            [hypers, evokedBins] = fetch1(...
+                covest.Traces*covest.CovMatrix & covest.plots.exampleSite ...
+                & 'method=90' & 'nFolds = 1','hypers','evoked_bins');
+            
+            nFolds = 10;
+            cvloss = nan(31,31,nFolds);
+            [alpha,beta] = ndgrid(...
+                hypers(2)*exp(linspace(-1,1,size(cvloss,1))), ...
+                hypers(3)*exp(linspace(-1,1,size(cvloss,2))));
+            sparsity = nan(size(alpha));
+            nLatent = nan(size(alpha));
+            for iAlpha = 1:size(cvloss,1)
+                for iBeta = 1:size(cvloss,2)
+                    hypers(2) = alpha(iAlpha,iBeta);
+                    hypers(3) = beta(iAlpha,iBeta);
+                    fprintf('%02d-%02d ',iAlpha,iBeta)
+                    for k=1:nFolds
+                        [X, XTest] = cove.splitTrials(Xsaved,k,nFolds);
+                        C = cove.estimate(X, [], evokedBins, 'lv-glasso', hypers);
+                        CTest = cove.estimate(XTest,[],evokedBins, 'sample', []);
+                        cvloss(iAlpha,iBeta,k) = loss(C,CTest);
+                        fprintf .
+                    end
+                    [~,~,extras] = cove.estimate(Xsaved, [], evokedBins, 'lv-glasso', hypers);
+                    sparsity(iAlpha,iBeta) = cove.sparsity(extras.S);
+                    nLatent(iAlpha,iBeta) = size(extras.H,2);
+                    fprintf(' sparsity %1.3f  nLatent %3d\n', ...
+                        sparsity(iAlpha,iBeta), nLatent(iAlpha,iBeta));
+                end
+            end
+            save ~/comment4v2
+        end
+        
+        
+        function cvSpace2
+            s = load('~/comment4v2');
+            connectivity = 1-s.sparsity;
+            
+            [hypers] = fetch1(...
+                covest.Traces*covest.CovMatrix & covest.plots.exampleSite ...
+                & 'method=90' & 'nFolds = 1','hypers');
+            fig = Figure(1,'size',[80 70]);
+            cvloss = mean(s.cvloss,3);
+            cvloss = cvloss - min(cvloss(:));
+            alpha = s.alpha(:,1);
+            beta = s.beta(1,:);
+            [C,h] = contour(alpha,beta,cvloss,'k');
+            clabel(C,h)
+            xlabel \alpha
+            ylabel \beta
+            yticks = 0.1:0.1:1;
+            xticks = 0.01:0.01:0.1;
+            set(gca,'XScale','log','YScale','log',...
+                'XTick',xticks,'XTickLabel',nozero(xticks), ...
+                'YTick',yticks,'YTickLabel',nozero(yticks))
+            hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'rebut1-4-A.eps'))
+            
+            
+            fig = Figure(1,'size',[80 70]);
+            [C,h] = contour(alpha,beta,s.nLatent,'k');
+            clabel(C,h)
+            xlabel \alpha
+            ylabel \beta
+            yticks = 0.1:0.1:1;
+            xticks = 0.01:0.01:0.1;
+            set(gca,'XScale','log','YScale','log',...
+                'XTick',xticks,'XTickLabel',nozero(xticks), ...
+                'YTick',yticks,'YTickLabel',nozero(yticks))
+            hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'rebut1-4-B.eps'))
+            
+            
+            fig = Figure(1,'size',[80 70]);
+            [C,h] = contour(alpha,beta,connectivity,'k');
+            clabel(C,h)
+            xlabel \alpha
+            ylabel \beta
+            yticks = 0.1:0.1:1;
+            xticks = 0.01:0.01:0.1;
+            set(gca,'XScale','log','YScale','log',...
+                'XTick',xticks,'XTickLabel',nozero(xticks), ...
+                'YTick',yticks,'YTickLabel',nozero(yticks))
+            hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'rebut1-4-C.eps'))
+           
+            
+            fig = Figure(1,'size',[80 70]);
+            [n,sp] = fetch1(covest.CovMatrix & covest.plots.exampleSite ...
+                & 'method=90' & 'nFolds = 1','lowrank','sparsity');
+            n = size(n,2);
+            F = scatteredInterpolant(connectivity(:),s.nLatent(:),cvloss(:),'linear','none');
+            [nLatent,connectivity] = ndgrid(0:1:120,0.0:0.01:0.45);
+            cvloss = F(connectivity,nLatent);
+            cvloss = medfilt1(cvloss,9);
+            k = hamming(5); k = k/sum(k);
+            cvloss = imfilter(imfilter(cvloss,k,nan),k',nan);            
+            [C,h] = contour(connectivity,nLatent,cvloss,'k');
+            clabel(C,h)
+            hold on, plot(1-sp,n,'r+','MarkerSize',30), hold off
+            xlabel connectivity
+            ylabel '# latent'
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'rebut1-4-D.eps'))            
+        end
+        
         
         function stimCond
+            % correlations and connectivity conditioned on the stimulus
             doCorrs = false;
             
             c = covest.CovMatrix & 'nfolds=1';
             c1 = c.pro('method->m1','sparse->s1','cov_matrix->c1');
-            c2 = c.pro('method->m2','sparse->s2','cov_matrix->c2'); 
+            c2 = c.pro('method->m2','sparse->s2','cov_matrix->c2');
             [S1,S2,C1,C2,dirs,pval,selection] = fetchn(covest.ActiveCells*pro(covest.OriTuning,'high_repeats->temp','von_pref','von_p_value')*c1*c2 & 'm1=92 && m2=93', ...
                 's2','s1','c1','c2','von_pref','von_p_value','selection');
             dirs = cellfun(@(dirs,selection) dirs(selection)/pi*180, dirs, selection, 'uni', false);
@@ -36,7 +157,7 @@ classdef plots
                     cellfun(@(C,dirs,pval) avgCorr(C,dirs,pval, 0), C2, dirs, pval)'
                     ];
             end
-
+            
             d = d(:,~any(isnan(d)));
             fig = Figure(1,'size',[40 40]);
             plot(d([1,3],:),'-ro')
@@ -45,9 +166,9 @@ classdef plots
             xlim([0.5 2.5])
             fig.cleanup
             if doCorrs
-                fig.save(fullfile(covest.plots.figPath,'supp3-A.eps'))
+                fig.save(fullfile(covest.plots.figPath,'Supp3-A.eps'))
             else
-                fig.save(fullfile(covest.plots.figPath,'supp3-B.eps'))
+                fig.save(fullfile(covest.plots.figPath,'Supp3-B.eps'))
             end
             
             function ret = ndegree(S,dirs,pval,filt)
@@ -55,7 +176,7 @@ classdef plots
                 if sum(ix)<10
                     ret = nan;
                 else
-                    ret = (1-cove.sparsity(S(ix,ix)))/(1-cove.sparsity(S));  
+                    ret = (1-cove.sparsity(S(ix,ix)))/(1-cove.sparsity(S));
                 end
             end
             
@@ -113,7 +234,7 @@ classdef plots
             fig.cleanup
             fig.save(fullfile(covest.plots.figPath,'Fig2-F.eps'))
         end
-
+        
         
         
         function fig3
@@ -122,19 +243,19 @@ classdef plots
                 
                 switch f{1}
                     case {'Fig3','Supp2'}
-                    pairs = {
-                        0   90    'sample'
-                        10  90    'diag'
-                        30  90    'factor'
-                        80  90    'sparse'
-                        };
+                        pairs = {
+                            0   90    'sample'
+                            10  90    'diag'
+                            30  90    'factor'
+                            80  90    'sparse'
+                            };
                     case 'Supp1'
-                    pairs = {
-                        0   80    'sample'
-                        10  80    'diag'
-                        30  80    'factor'
-                        90  80    sprintf('sparse\n+latent')
-                        };
+                        pairs = {
+                            0   80    'sample'
+                            10  80    'diag'
+                            30  80    'factor'
+                            90  80    sprintf('sparse\n+latent')
+                            };
                     otherwise
                         error 'unknown figure'
                 end
@@ -315,7 +436,7 @@ classdef plots
                     paperSize = [8.3 7.5];
                 end
             end
-           
+            
             % get cell positions, tuning, and sparse interactions
             key = fetch(covest.CovMatrix & covest.plots.exampleSite & 'method=90' & 'nfolds=1');
             assert(isscalar(key))
@@ -348,7 +469,7 @@ classdef plots
             else
                 fname = fullfile(covest.plots.figPath,'Fig2-E');
             end
-
+            
             x = xyz(:,1);
             y = xyz(:,2);
             z = xyz(:,3)+zref;
@@ -386,7 +507,7 @@ classdef plots
             
             
             if doInteractions
-                [i,j] = ndgrid(1:size(S,1),1:size(S,2));                
+                [i,j] = ndgrid(1:size(S,1),1:size(S,2));
                 % positive interactions
                 ix = find(j(:)>i(:) & S(:)>0);
                 for ix = ix'
@@ -622,7 +743,7 @@ classdef plots
                 clear hasEnough
                 
                 % panel B or C: average correlations vs distance
-                if vertical 
+                if vertical
                     fig = Figure(1,'size',[40,30]);
                     fname = fullfile(covest.plots.figPath, 'Fig6-C.eps');
                 else
@@ -666,7 +787,7 @@ classdef plots
                 D = D(isConn);
                 S = S(isConn);
                 avgConn = avgConn(isConn);
-
+                
                 % panels E and F: connectivity vs ori tuning
                 if vertical
                     fig = Figure(1,'size',[40,30]);
@@ -703,7 +824,7 @@ classdef plots
                 ylabel 'rel. connectivity'
                 
                 fig.cleanup
-                fig.save(fname)                
+                fig.save(fname)
             end
             
             
@@ -763,7 +884,7 @@ classdef plots
             
             % exclude sites that don't have enough tuned cell pairs in each bin
             hasEnough = 100 < cellfun(@(D) min(hist(D,1:nBins)), D);
-             fprintf('Qualifying sites n=%d\n', sum(hasEnough))
+            fprintf('Qualifying sites n=%d\n', sum(hasEnough))
             D = D(hasEnough);
             C0 = C0(hasEnough);
             C1 = C1(hasEnough);

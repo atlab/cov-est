@@ -55,7 +55,7 @@ for key = fetch(covest.ActiveCells & 'preprocess_method_num=5' & 'high_repeats')
     colorbar
     subplot 432, imagesc(cc2,[-1 1]*.2), axis image off, title 'binned variance'
     colorbar
-    colormap(covest.lib.doppler)
+    colormap(cove.doppler)
     
     n = size(cc1,1);
     [i,j] = meshgrid(1:n,1:n);

@@ -7,7 +7,7 @@ if nFolds == 1
     XTest = [];
 else
     s = rng;
-    rng(0) % alreays split the same way
+    rng(0) % always split the same way
     iTrials = mod(1:nTrials,nFolds)+1;
     iTrials = iTrials(randperm(end));
     XTest = X(:,:,iTrials==fold,:);

@@ -57,7 +57,8 @@ switch covEstimation
         C = C/scale;
         alpha = hypers(2);
         beta = 10;
-        extras = cove.lvglasso(C,alpha,beta,struct('refit',false,'max_latent',0));
+        cove.set('max_latent',0);        
+        extras = cove.lvglasso(C,alpha,beta,cove.set);
         extras.S = extras.S/scale;  % scale back
         C = inv(extras.S);        
         
@@ -70,7 +71,8 @@ switch covEstimation
         C = C/scale;
         alpha = hypers(2);
         beta = hypers(3);
-        extras = cove.lvglasso(C,alpha,beta,struct('refit',false));
+        cove.set('max_latent',inf);
+        extras = cove.lvglasso(C,alpha,beta,cove.set);
         extras.S = extras.S/scale;  % scale back
         extras.L = extras.L/scale;
         [H,D] = svds(extras.L,sum(~~extras.eigL));

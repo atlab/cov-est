@@ -29,7 +29,7 @@ def.maxiter = 1e4;
 def.stoptol = 1e-5;
 def.tau = 0.6;
 def.refit = false;
-def.max_latent = size(SigmaO,1)-1;
+def.max_latent = inf;
 
 % parameter opts overrides defaults
 if nargin<4
@@ -44,7 +44,7 @@ n = size(SigmaO,1);
 s.S = eye(n); s.L = zeros(n,n); s.Lambda = zeros(n);
 mu = opts.mu; eta = opts.eta; tau = opts.tau;
 ~opts.verbose || fprintf('ADMM: alpha=%1.3f  beta=%1.3f\n',alpha,beta); %#ok<VUNUS>
-max_latent = min(n,opts.max_latent);
+max_latent = min(n-1,opts.max_latent);
 
 % Phase 1: L1-regularized sparsification (equavelent to original algorithm).
 for iter = 1:opts.maxiter

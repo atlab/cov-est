@@ -55,7 +55,6 @@ hypers = cellfun(@(h,ix) h(ix), searchSpace, mix);
 fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
 
 
-
     function visit(ix)
         % visit a point on the search space specified by ix
         % but return if already visited
@@ -64,29 +63,21 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
         ix = sub2ind([dims ones(1,2-length(dims))],ix{:});
         alreadyVisited = ismember(ix,visited);
         if ~alreadyVisited
+            fprintf('%2.4g  ', hypers_)
             visited(end+1) = ix;
-            losses(end+1) = cvLoss(hypers_);
+            losses(end+1) = mean(arrayfun(@(k) cvLoss(hypers_,k), 1:K));
+            fprintf(':  mean loss %g\n', losses(end))
         end
     end
 
 
-    function L = cvLoss(hypers)
-        % compute avearge cross-validation loss
-        fprintf('%g  ', hypers)
-        L = nan(1,K);
-        for k=1:K
-            % record average loss
-            [XTrain,XTest] = cove.splitTrials(X,k,K);
-            C0 = cove.estimate(XTrain, [], evokedBins, 'sample', {});
-            C = cove.estimate(XTrain, [], evokedBins, covEstimation, hypers);
-            L(k) = loss(C, ...
-                cove.estimate(XTest, [], evokedBins, 'sample', {}));
-            if isnan(L(k)), break, end
-        end
-        L = mean(L);
+    function L = cvLoss(hypers,k)
+        % compute cross-validation loss
+        [XTrain,XTest] = cove.splitTrials(X,k,K);
+        [C, M] = cove.estimate(XTrain, [], evokedBins, covEstimation, hypers);
+        L = loss(C, cove.estimate(XTest, M, evokedBins,'sample', {}));
         if isnan(L)
             L = inf;
         end
-        fprintf(':  mean loss %g\n', L)
     end
 end

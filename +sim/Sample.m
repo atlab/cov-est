@@ -15,7 +15,7 @@ classdef Sample < dj.Relvar & dj.AutoPopulate
     
     methods(Access=protected)
         function makeTuples(self, key)
-            sampleSeed = 32000;
+            sampleSeed = 32000+fetch1(sim.Truth & key, 'truth_seed');
             assert(sampleSeed ~= fetch1(sim.Truth & key, 'truth_seed'))
             rng(sampleSeed)
             n = fetch1(sim.SampleSize & key, 'sample_size');
