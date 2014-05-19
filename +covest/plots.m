@@ -51,12 +51,12 @@ classdef plots
                         sparsity(iAlpha,iBeta), nLatent(iAlpha,iBeta));
                 end
             end
-            save ~/comment4v2
+            save ~/comment4v3
         end
         
         
         function cvSpace2
-            s = load('~/comment4v2');
+            s = load('~/comment4v3');
             connectivity = 1-s.sparsity;
             
             [hypers] = fetch1(...
@@ -109,7 +109,7 @@ classdef plots
             hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
             fig.cleanup
             fig.save(fullfile(covest.plots.figPath,'rebut1-4-C.eps'))
-           
+            
             
             fig = Figure(1,'size',[80 70]);
             [n,sp] = fetch1(covest.CovMatrix & covest.plots.exampleSite ...
@@ -120,14 +120,14 @@ classdef plots
             cvloss = F(connectivity,nLatent);
             cvloss = medfilt1(cvloss,9);
             k = hamming(5); k = k/sum(k);
-            cvloss = imfilter(imfilter(cvloss,k,nan),k',nan);            
+            cvloss = imfilter(imfilter(cvloss,k,nan),k',nan);
             [C,h] = contour(connectivity,nLatent,cvloss,'k');
             clabel(C,h)
             hold on, plot(1-sp,n,'r+','MarkerSize',30), hold off
             xlabel connectivity
             ylabel '# latent'
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'rebut1-4-D.eps'))            
+            fig.save(fullfile(covest.plots.figPath,'rebut1-4-D.eps'))
         end
         
         
@@ -166,9 +166,9 @@ classdef plots
             xlim([0.5 2.5])
             fig.cleanup
             if doCorrs
-                fig.save(fullfile(covest.plots.figPath,'Supp3-A.eps'))
+                fig.save(fullfile(covest.plots.figPath,'Supp5-A.eps'))
             else
-                fig.save(fullfile(covest.plots.figPath,'Supp3-B.eps'))
+                fig.save(fullfile(covest.plots.figPath,'Supp5-B.eps'))
             end
             
             function ret = ndegree(S,dirs,pval,filt)
@@ -239,17 +239,17 @@ classdef plots
         
         function fig3
             
-            for f = {'Fig3','Supp1','Supp2'}
+            for f = {'Fig3','Supp3','Supp4'}
                 
                 switch f{1}
-                    case {'Fig3','Supp2'}
+                    case {'Fig3','Supp4'}
                         pairs = {
                             0   90    'sample'
                             10  90    'diag'
                             30  90    'factor'
                             80  90    'sparse'
                             };
-                    case 'Supp1'
+                    case 'Supp3'
                         pairs = {
                             0   80    'sample'
                             10  80    'diag'
@@ -260,12 +260,12 @@ classdef plots
                         error 'unknown figure'
                 end
                 ticks = 0:0.01:.1;
-                if any(strcmp(f{1},{'Fig3','Supp1'}))
+                if any(strcmp(f{1},{'Fig3','Supp3'}))
                     c = covest.CovMatrix & 'nfolds>1';
                     c1 = pro(c, 'method->m1','cv_loss->l1');
                     c2 = pro(c, 'method->m2','cv_loss->l2');
                     xlabl = 'nats/cell/bin';
-                elseif strcmp(f{1},'Supp2')
+                elseif strcmp(f{1},'Supp4')
                     c = covest.CovMatrix*covest.QuadLoss & 'nfolds>1';
                     c1 = pro(c, 'method->m1','quad_loss->l1');
                     c2 = pro(c, 'method->m2','quad_loss->l2');
@@ -956,16 +956,135 @@ classdef plots
             
             fig.cleanup
             fig.save(fname)
-            
-            
-            
-            
-            
-            function ret = oriDiffMatrix(ori)
-                % make a matrix of orientation differences
-                [ori1,ori2] = ndgrid(ori,ori);
-                ret = oriDiff(ori1,ori2);
+        end
+        
+        function supp1A
+            alphas = [.02 .5 .8];
+            L = zeros(0,length(alphas));
+            nfolds = 10;
+            for key = fetch(covest.ActiveCells & 'preprocess_method_num=5' & 'high_repeats' & 'ncells>100')'
+                fprintf .
+                [X,evokedBins,sel] = fetch1(covest.ActiveCells*covest.Traces & key, ...
+                    'trace_segments','evoked_bins', 'selection');
+                X = X(1:min(end,evokedBins),:,:,sel);
+                [nBins,nCond,nTrials,nCells] = size(X); %#ok<ASGLU>
+                L(end+1,:) = arrayfun(@(alpha) ...
+                    mean(arrayfun(@(k) getLoss(X,k,nfolds,true,alpha), 1:nfolds)) - ...
+                    mean(arrayfun(@(k) getLoss(X,k,nfolds,false), 1:nfolds)),...
+                    alphas);     %#ok<AGROW>
             end
+            
+            fig = Figure(1, 'size', [163 35]);
+            h = boxplot(L,'jitter',0,'colors','k',...
+                'labels',arrayfun(@(a) sprintf('a = %1.2f',a), alphas,'uni',false),...
+                'orientation','horizontal','outliersize',3);
+            set(h(1:2,:),'LineStyle','-','LineWidth',.25)
+            set(h(7,:),'MarkerEdgeColor','k')
+            xlabel nats/cell/bin
+            set(gca,'YColor',[1 1 1],'YDir','reverse')
+            hold on
+            plot([0 0],ylim,'k:')
+            hold off
+            set(gca,'Position',[0.1 0.3 0.89 0.7])
+            
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'Supp1A.eps'))
+            
+            
+            
+            
+            function L = getLoss(X, k, nfolds, binwise, alpha)
+                
+                loss = @(S,Sigma)(trace(Sigma/S)+cove.logDet(S))/size(S,1);
+                
+                [Z, Y] = cove.splitTrials(X,k,nfolds);
+                Z = double(Z);
+                
+                % training
+                M = nanmean(Z,3);
+                Z = bsxfun(@minus, Z, M);
+                % common variance
+                V0 = nanvar(reshape(Z,[],nCells));
+                V0 = reshape(V0,1,1,1,nCells);
+                if ~binwise
+                    V = V0;
+                else
+                    % bin-wise variance
+                    V = nanvar(Z,[],3);
+                    % condition-wise variance
+                    % V = mean(V);
+                    % regularize: bias toward common variance
+                    V = bsxfun(@plus,(1-alpha)*V, alpha*V0);
+                end
+                V = sqrt(V);
+                Z = bsxfun(@rdivide, Z, V);  % zscore
+                C = corrcov(cove.cov(reshape(Z,[],nCells)));  % correlation matrix
+                
+                % testing
+                Y = double(Y);
+                Y = bsxfun(@minus, Y, M);
+                Y = bsxfun(@rdivide, Y, V);
+                
+                L = loss(C, cove.cov(reshape(Y,[],nCells)));
+            end
+        end
+        
+        
+        
+        function supp1BC
+            % Supplementary Figure 1, panels B and C
+            % assess effect of common variance assumption on limited-range correlations
+            
+            C1 = zeros(0,3);  % average correlation of similarly tuned cells
+            C2 = zeros(0,3);  % average correlation of differently tuned cells
+            oriRel = pro(covest.OriTuning,'high_repeats->temp','*');
+            for key = fetch(covest.ActiveCells*oriRel & 'ncells>100')'
+                [X,evokedBins,sel,ori,pval] = fetch1(covest.ActiveCells*covest.Traces*oriRel & key, ...
+                    'trace_segments','evoked_bins', 'selection','von_pref','von_p_value');
+                X = double(X(1:min(end,evokedBins),:,:,sel));  % only evoked bins
+                ori = ori(sel)*180/pi;
+                pval = pval(sel);
+                c0 = corrVar(X,'bin');
+                c1 = corrVar(X,'cond');
+                c2 = corrVar(X,'common');
+                
+                q = [nan 1];
+                ori(pval>0.05)=nan;  % exclude untuned cells
+                od = oriDiff(ori,ori');
+                
+                % average correlations between differently tuned cells
+                ix = q((~isnan(od) & od < 15)+1);
+                [cc1,n] = cellfun(@(c) avgOffDiag(c.*ix), {c0 c1 c2});
+                if any(n<300), continue, end
+                
+                % average correlations between similarly tuned cells
+                ix = q((~isnan(od) & od > 45)+1);
+                [cc2,n] = cellfun(@(c) avgOffDiag(c.*ix), {c0 c1 c2});
+                if any(n<300), continue, end
+                
+                C1(end+1,:) = cc1; %#ok<AGROW>
+                C2(end+1,:) = cc2; %#ok<AGROW>
+            end
+            fig = Figure(1,'size',[80 35]);
+            h = boxplot([C1(:,1) C2(:,1)],'jitter',0,'colors','k',...
+                'labels',{'<15','>45'},'orientation','horizontal','outliersize',3);
+            set(h(1:2,:),'LineStyle','-','LineWidth',.25)
+            set(h(7,:),'MarkerEdgeColor','k')
+            xlabel 'avg corr'
+            xlim(xlim.*[0 1])
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'Supp1B.eps'))
+            
+            fig = Figure(1,'size',[80 35]);
+            h = boxplot(C1-C2,'jitter',0,'colors','k',...
+                'labels',{'per bin' 'per condition','common'},'orientation','horizontal','outliersize',3);
+            set(h(1:2,:),'LineStyle','-','LineWidth',.25)
+            set(h(7,:),'MarkerEdgeColor','k')
+            xlim(xlim.*[0 1])
+            xlabel '\Delta avg corr'
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'Supp1C.eps'))            
+            
         end
     end
 end
@@ -986,21 +1105,61 @@ end
 end
 
 
+function ret = oriDiffMatrix(ori)
+% make a matrix of orientation differences
+ret = oriDiff(ori,ori');
+end
+
+
+function C = corrVar(Z,varComp)
+% compute the correlation matrix with different variance assumptions
+[nBins,nConds,nTrials,nCells] = size(Z);
+
+M = nanmean(Z,3);
+Z = bsxfun(@minus, Z, M);
+
+% common variance
+V0 = nanvar(reshape(Z,[],nCells));
+V0 = reshape(V0,1,1,1,nCells);
+a = 0.01; % very modest regularization
+
+switch varComp
+    case 'common'
+        V = V0;
+    case 'bin'
+        % bin-wise variance
+        V = nanvar(Z,[],3);
+    case 'cond'
+        V = mean(nanvar(Z,[],3));
+    otherwise
+        error 'unknown variance computation'
+end
+V = bsxfun(@plus, a*V0, (1-a)*V);
+Z = bsxfun(@rdivide, Z, sqrt(V));
+C = corrcov(cove.cov(reshape(Z,[],nCells)));
+end
+
+
 function d=oriDiff(ori1,ori2)
 % compute the absolute difference between orientations ori1 and ori2 (in degrees)
 ori1 = mod(ori1, 180);
 ori2 = mod(ori2, 180);
-b1 = min(ori1,ori2);
-b2 = max(ori1,ori2);
+s = bsxfun(@plus, ori1, ori2); % ensure that nans remain in place since max(nan,A)==A
+b1 = s - bsxfun(@max,ori1,ori2);
+b2 = s - bsxfun(@min,ori1,ori2);
 d = min(b2-b1,b1+180-b2);
-d(isnan(ori1))=nan;
-d(isnan(ori2))=nan;
 end
-
 
 function ret = offDiag(C)
 % return the vector of off-diagonal elements of symmetric matrix C
 p = size(C,1);
 [i,j] = ndgrid(1:p,1:p);
 ret = C(i<j);
+end
+
+function [ret,n] = avgOffDiag(C)
+ret = nanmean(offDiag(C));
+if nargout>1
+    n = sum(~isnan(offDiag(C)));
+end
 end

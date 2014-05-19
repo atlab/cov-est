@@ -15,14 +15,15 @@ sparsity=0                  : float                         # fraction of zeros 
 cv_loss=null                : double                        # cross-validation loss
 host                        : varchar(255)                  # computer that did the job
 computing_time              : float                         # (s) time required to compute
-cm_ts=CURRENT_TIMESTAMP     : timestamp                     # 
+cm_ts=CURRENT_TIMESTAMP     : timestamp                     #
 %}
 
 classdef CovMatrix < dj.Relvar & dj.AutoPopulate
     
     properties
         popRel  = covest.ActiveCells * covest.Traces * covest.Method * covest.Fold ...
-            & 'preprocess_method_num=5' & 'ndirs=2 || `condition`=0' & 'ncells>100'
+            & 'preprocess_method_num=5' & 'ndirs=2 || `condition`=0' & 'ncells>100' & ...
+            'method in (0,10,30,80,90)'
     end
     
     methods(Access=protected)
