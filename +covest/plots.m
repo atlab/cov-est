@@ -11,7 +11,7 @@ classdef plots
     methods(Static)
         
         
-        function cvSpace
+        function supp2pre
             loss = @(S,Sigma)(trace(Sigma/S)+cove.logDet(S))/size(S,1);
             
             
@@ -26,7 +26,7 @@ classdef plots
                 & 'method=90' & 'nFolds = 1','hypers','evoked_bins');
             
             nFolds = 10;
-            cvloss = nan(31,31,nFolds);
+            cvloss = nan(41,41,nFolds);
             [alpha,beta] = ndgrid(...
                 hypers(2)*exp(linspace(-1,1,size(cvloss,1))), ...
                 hypers(3)*exp(linspace(-1,1,size(cvloss,2))));
@@ -39,8 +39,8 @@ classdef plots
                     fprintf('%02d-%02d ',iAlpha,iBeta)
                     for k=1:nFolds
                         [X, XTest] = cove.splitTrials(Xsaved,k,nFolds);
-                        C = cove.estimate(X, [], evokedBins, 'lv-glasso', hypers);
-                        CTest = cove.estimate(XTest,[],evokedBins, 'sample', []);
+                        [C,M] = cove.estimate(X, [], evokedBins, 'lv-glasso', hypers);
+                        CTest = cove.estimate(XTest,M,evokedBins, 'sample', []);
                         cvloss(iAlpha,iBeta,k) = loss(C,CTest);
                         fprintf .
                     end
@@ -51,12 +51,12 @@ classdef plots
                         sparsity(iAlpha,iBeta), nLatent(iAlpha,iBeta));
                 end
             end
-            save ~/comment4v3
+            save ~/comment4v4
         end
         
         
-        function cvSpace2
-            s = load('~/comment4v3');
+        function supp2
+            s = load('~/comment4v4');
             connectivity = 1-s.sparsity;
             
             [hypers] = fetch1(...
@@ -67,7 +67,7 @@ classdef plots
             cvloss = cvloss - min(cvloss(:));
             alpha = s.alpha(:,1);
             beta = s.beta(1,:);
-            [C,h] = contour(alpha,beta,cvloss,'k');
+            [C,h] = contour(alpha,beta,cvloss','k');
             clabel(C,h)
             xlabel \alpha
             ylabel \beta
@@ -78,11 +78,33 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'rebut1-4-A.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-A.eps'))
+            
+            fig = Figure(1,'size',[80 70]);
+            
+            v = 0:0.01:0.5;
+            vv = v;
+            vv(1:5:end) = [];
+            v = v(1:5:end);
+            contour(alpha,beta,connectivity',vv,'Color',[1 1 1]*.7,'LineWidth',.25)
+            hold on
+            [C,h] = contour(alpha,beta,connectivity',v,'k');
+            hold off
+            clabel(C,h)
+            xlabel \alpha
+            ylabel \beta
+            yticks = 0.1:0.1:1;
+            xticks = 0.01:0.01:0.1;
+            set(gca,'XScale','log','YScale','log',...
+                'XTick',xticks,'XTickLabel',nozero(xticks), ...
+                'YTick',yticks,'YTickLabel',nozero(yticks))
+            hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
+            fig.cleanup
+            fig.save(fullfile(covest.plots.figPath,'Supp2-B.eps'))
             
             
             fig = Figure(1,'size',[80 70]);
-            [C,h] = contour(alpha,beta,s.nLatent,'k');
+            [C,h] = contour(alpha,beta,s.nLatent','k');
             clabel(C,h)
             xlabel \alpha
             ylabel \beta
@@ -93,22 +115,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'rebut1-4-B.eps'))
-            
-            
-            fig = Figure(1,'size',[80 70]);
-            [C,h] = contour(alpha,beta,connectivity,'k');
-            clabel(C,h)
-            xlabel \alpha
-            ylabel \beta
-            yticks = 0.1:0.1:1;
-            xticks = 0.01:0.01:0.1;
-            set(gca,'XScale','log','YScale','log',...
-                'XTick',xticks,'XTickLabel',nozero(xticks), ...
-                'YTick',yticks,'YTickLabel',nozero(yticks))
-            hold on, plot(hypers(2),hypers(3),'r+','MarkerSize',30), hold off
-            fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'rebut1-4-C.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-C.eps'))
             
             
             fig = Figure(1,'size',[80 70]);
@@ -116,18 +123,19 @@ classdef plots
                 & 'method=90' & 'nFolds = 1','lowrank','sparsity');
             n = size(n,2);
             F = scatteredInterpolant(connectivity(:),s.nLatent(:),cvloss(:),'linear','none');
-            [nLatent,connectivity] = ndgrid(0:1:120,0.0:0.01:0.45);
+            [nLatent,connectivity] = ndgrid(0:1:120,0.0:0.01:0.3);
             cvloss = F(connectivity,nLatent);
-            cvloss = medfilt1(cvloss,9);
-            k = hamming(5); k = k/sum(k);
+            cvloss = medfilt1(cvloss,7);
+            k = hamming(3); k = k/sum(k);
             cvloss = imfilter(imfilter(cvloss,k,nan),k',nan);
             [C,h] = contour(connectivity,nLatent,cvloss,'k');
             clabel(C,h)
             hold on, plot(1-sp,n,'r+','MarkerSize',30), hold off
             xlabel connectivity
             ylabel '# latent'
+            ylim([0 110])
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'rebut1-4-D.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-D.eps'))
         end
         
         
@@ -192,14 +200,6 @@ classdef plots
         end
         
         
-        function avgCorr
-            C = fetchn(covest.CovMatrix & 'method=0' & 'nfolds=1','cov_matrix');
-            C = cellfun(@corrcov, C, 'uni', false);
-            C = cellfun(@offDiag, C, 'uni', false);
-            C = cellfun(@mean, C);
-        end
-        
-        
         function fig2
             % panel C
             fig = Figure(1,'size',[35 32]);
@@ -238,9 +238,7 @@ classdef plots
         
         
         function fig3
-            
             for f = {'Fig3','Supp3','Supp4'}
-                
                 switch f{1}
                     case {'Fig3','Supp4'}
                         pairs = {
@@ -394,13 +392,13 @@ classdef plots
         
         
         function network
-            % figures 2E, 4G, H,a and I
+            % figures 4E, 4G, H,a and I
             
             clf
             
-            doInteractions = false;  % true=plot interactions, false=only cells
-            doCorr = false; % when true, plot thresholded correlations in the fragment
-            doFragment = false || doInteractions;  % when, true plot only the inner fragment
+            doInteractions = true;  % true=plot interactions, false=only cells
+            doCorr = true; % when true, plot thresholded correlations in the fragment
+            doFragment = true;
             doFragment = doFragment || doCorr;
             
             % figure 4-G,H,I
@@ -416,9 +414,9 @@ classdef plots
             zm = .60;
             panx = 1.3;
             pany = 0;
-            alphaMultiplier = 3.0*(1+doFragment);
+            alphaMultiplier = 3.0+3.0*doFragment;
             
-            fname = fullfile(covest.plots.figPath,'Fig2-G');
+            fname = fullfile(covest.plots.figPath,'Fig4-G');
             
             if doFragment
                 fragmentRadius = 48;
@@ -430,7 +428,7 @@ classdef plots
                 fragmentRadius = inf;
                 if doInteractions
                     paperSize = [12 11];
-                    lineWidth = .25;
+                    lineWidth = 0.5;
                 else
                     panx = 2.5;
                     paperSize = [8.3 7.5];
@@ -462,9 +460,9 @@ classdef plots
             if doInteractions
                 if doCorr
                     S = C0;
-                    fname = fullfile(covest.plots.figPath,'Fig2-I');
+                    fname = fullfile(covest.plots.figPath,'Fig4-I');
                 elseif doFragment
-                    fname = fullfile(covest.plots.figPath,'Fig2-H');
+                    fname = fullfile(covest.plots.figPath,'Fig4-H');
                 end
             else
                 fname = fullfile(covest.plots.figPath,'Fig2-E');
@@ -511,7 +509,7 @@ classdef plots
                 % positive interactions
                 ix = find(j(:)>i(:) & S(:)>0);
                 for ix = ix'
-                    lineAlpha = min(1,(alphaMultiplier*1*abs(S(ix))));
+                    lineAlpha = min(1,(alphaMultiplier*2.0*abs(S(ix))));
                     patch([x(i(ix)) x(j(ix))],[y(i(ix)) y(j(ix))], [z(i(ix)) z(j(ix))], [0 0], ...
                         'EdgeColor',[0 1 0]/2,'EdgeAlpha',lineAlpha,'LineWidth',lineWidth,'FaceColor','none')
                 end
@@ -959,7 +957,7 @@ classdef plots
         end
         
         function supp1A
-            alphas = [.02 .5 .8];
+            alphas = [.05 .2 .3 .4 .5 .6 .8 1];
             L = zeros(0,length(alphas));
             nfolds = 10;
             for key = fetch(covest.ActiveCells & 'preprocess_method_num=5' & 'high_repeats' & 'ncells>100')'
@@ -1025,7 +1023,7 @@ classdef plots
                 Y = bsxfun(@minus, Y, M);
                 Y = bsxfun(@rdivide, Y, V);
                 
-                L = loss(C, cove.cov(reshape(Y,[],nCells)));
+                L = loss(C, cove.cov(reshape(Y,[],nCells))) + nanmean(log(V(:)));
             end
         end
         
@@ -1035,8 +1033,8 @@ classdef plots
             % Supplementary Figure 1, panels B and C
             % assess effect of common variance assumption on limited-range correlations
             
-            C1 = zeros(0,3);  % average correlation of similarly tuned cells
-            C2 = zeros(0,3);  % average correlation of differently tuned cells
+            C1 = zeros(0,2);  % average correlation of similarly tuned cells
+            C2 = zeros(0,2);  % average correlation of differently tuned cells
             oriRel = pro(covest.OriTuning,'high_repeats->temp','*');
             for key = fetch(covest.ActiveCells*oriRel & 'ncells>100')'
                 [X,evokedBins,sel,ori,pval] = fetch1(covest.ActiveCells*covest.Traces*oriRel & key, ...
@@ -1045,8 +1043,7 @@ classdef plots
                 ori = ori(sel)*180/pi;
                 pval = pval(sel);
                 c0 = corrVar(X,'bin');
-                c1 = corrVar(X,'cond');
-                c2 = corrVar(X,'common');
+                c1 = corrVar(X,'common');
                 
                 q = [nan 1];
                 ori(pval>0.05)=nan;  % exclude untuned cells
@@ -1054,18 +1051,18 @@ classdef plots
                 
                 % average correlations between differently tuned cells
                 ix = q((~isnan(od) & od < 15)+1);
-                [cc1,n] = cellfun(@(c) avgOffDiag(c.*ix), {c0 c1 c2});
+                [cc1,n] = cellfun(@(c) avgOffDiag(c.*ix), {c0 c1});
                 if any(n<300), continue, end
                 
                 % average correlations between similarly tuned cells
                 ix = q((~isnan(od) & od > 45)+1);
-                [cc2,n] = cellfun(@(c) avgOffDiag(c.*ix), {c0 c1 c2});
+                [cc2,n] = cellfun(@(c) avgOffDiag(c.*ix), {c0 c1});
                 if any(n<300), continue, end
                 
                 C1(end+1,:) = cc1; %#ok<AGROW>
                 C2(end+1,:) = cc2; %#ok<AGROW>
             end
-            fig = Figure(1,'size',[80 35]);
+            fig = Figure(1,'size',[80 25]);
             h = boxplot([C1(:,1) C2(:,1)],'jitter',0,'colors','k',...
                 'labels',{'<15','>45'},'orientation','horizontal','outliersize',3);
             set(h(1:2,:),'LineStyle','-','LineWidth',.25)
@@ -1075,9 +1072,9 @@ classdef plots
             fig.cleanup
             fig.save(fullfile(covest.plots.figPath,'Supp1B.eps'))
             
-            fig = Figure(1,'size',[80 35]);
+            fig = Figure(1,'size',[80 25]);
             h = boxplot(C1-C2,'jitter',0,'colors','k',...
-                'labels',{'per bin' 'per condition','common'},'orientation','horizontal','outliersize',3);
+                'labels',{'per bin' 'common'},'orientation','horizontal','outliersize',3);
             set(h(1:2,:),'LineStyle','-','LineWidth',.25)
             set(h(7,:),'MarkerEdgeColor','k')
             xlim(xlim.*[0 1])

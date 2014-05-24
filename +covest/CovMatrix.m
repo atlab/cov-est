@@ -4,6 +4,8 @@ covest.CovMatrix (computed) # regularized correlation matrix estimates
 -> covest.Method
 -> covest.Fold
 ---
+means                       : longblob                      # estimate of the means 
+variances                   : longblob                      # estimate of variances
 cov_matrix                  : longblob                      # estimated covariance matrix
 test_matrix=null            : longblob                      # sample cov matrix from the testing set
 sparse=null                 : longblob                      # sparse component of the matrix
@@ -22,8 +24,8 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
     
     properties
         popRel  = covest.ActiveCells * covest.Traces * covest.Method * covest.Fold ...
-            & 'preprocess_method_num=5' & 'ndirs=2 || `condition`=0' & 'ncells>100' & ...
-            'method in (0,10,30,80,90)'
+            & 'preprocess_method_num=5' & 'ndirs=2 || `condition`=0' & 'ncells>100' ...
+            & 'mean_regularization="none"' & 'var_regularization="none"'
     end
     
     methods(Access=protected)
