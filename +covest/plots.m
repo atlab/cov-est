@@ -39,12 +39,12 @@ classdef plots
                     fprintf('%02d-%02d ',iAlpha,iBeta)
                     for k=1:nFolds
                         [X, XTest] = cove.splitTrials(Xsaved,k,nFolds);
-                        [C,M] = cove.estimate(X, [], evokedBins, 'lv-glasso', hypers);
-                        CTest = cove.estimate(XTest,M,evokedBins, 'sample', []);
+                        [C,M,V] = cove.estimate(X, [], [], evokedBins, 'lv-glasso', hypers);
+                        CTest = cove.estimate(XTest,M,V,evokedBins, 'sample', []);
                         cvloss(iAlpha,iBeta,k) = loss(C,CTest);
                         fprintf .
                     end
-                    [~,~,extras] = cove.estimate(Xsaved, [], evokedBins, 'lv-glasso', hypers);
+                    [~,~,extras] = cove.estimate(Xsaved, [], [], evokedBins, 'lv-glasso', hypers);
                     sparsity(iAlpha,iBeta) = cove.sparsity(extras.S);
                     nLatent(iAlpha,iBeta) = size(extras.H,2);
                     fprintf(' sparsity %1.3f  nLatent %3d\n', ...
@@ -56,7 +56,7 @@ classdef plots
         
         
         function supp2
-            s = load('~/comment4v4');
+            s = load('~/comment4v5');
             connectivity = 1-s.sparsity;
             
             [hypers] = fetch1(...
@@ -302,8 +302,8 @@ classdef plots
         
         function fig4
             select = [covest.plots.exampleSite ' && nfolds=1'];
-            C0 = fetch1(covest.CovMatrix & select & 'method=0','cov_matrix');
-            [C1,S,L] = fetch1(covest.CovMatrix & select & 'method=90','cov_matrix','sparse','lowrank');
+            C0 = fetch1(covest.CovMatrix & select & 'method=0','corr_matrix');
+            [C1,S,L] = fetch1(covest.CovMatrix & select & 'method=90','corr_matrix','sparse','lowrank');
             p = size(C0,1);
             CC0 = corrcov(C0);
             
@@ -318,8 +318,8 @@ classdef plots
             iC0 = -corrcov(inv(C0));
             iC0 = (~eye(p)).*iC0;
             iC = inv(C1);
-            %ds = diag(sqrt(diag(iC)));
-            ds = diag(sqrt(diag(S)));
+            ds = diag(sqrt(diag(iC)));
+            %ds = diag(sqrt(diag(S)));
             iC = -(~eye(p)).*(ds\iC/ds);
             
             % partial correlation matrix: sample / regularized
@@ -445,7 +445,7 @@ classdef plots
             S = -corrcov(S);  % convert to partial correlations
             
             % thresholded correlations
-            C0= corrcov(fetch1(covest.CovMatrix & setfield(key, 'method', 0), 'cov_matrix')); %#ok<SFLD>
+            C0= corrcov(fetch1(covest.CovMatrix & setfield(key, 'method', 0), 'corr_matrix')); %#ok<SFLD>
             sparsity = fetch1(covest.CovMatrix & key, 'sparsity');
             p = size(C0,1);
             [i,j] = ndgrid(1:p,1:p);

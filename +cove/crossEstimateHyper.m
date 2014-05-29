@@ -1,16 +1,17 @@
-function [hypers, visited, losses] = crossEstimateHyper(X, evokedBins, loss, covEstimation, searchSpace)
+function [hypers, visited, losses] = crossEstimateHyper(X, evokedBins, reg, searchSpace)
 % find the values of hyperparamters that minimize the cross-validated loss
 % by K-fold cross-validation.
 %
 % INPUTS:
 %     X = nBins * nDirs * nTrials * nCells
-%     loss - loss function to be minimized, loss(C,Sigma) where C is estimate
 %     covEstimation -  string identifying the method for estimating the variance
-%     hypers - lists of valid values for each hyperparameter, in sequence
+%     reg - structure specifying regularization of means, variances, and correlations
+%     searchSpace - lists of valid values for each hyperparameter, in sequence
 %
 % OUTPUTS:
-%     C - optimized covariance estimate
-%     varargout - optimal values of hyperparameters
+%     hypers - optimal values of hyperparameters
+%     visited - the indices of visited hyperparameter values
+%     losses  - the loss function values for these hyperparameter values
 
 dims = cellfun(@length, searchSpace);
 nHypers = length(dims);
@@ -36,19 +37,20 @@ bestLoss = min(losses);
 while true
     lastBestLoss = bestLoss;
     [bestLoss,j] = min(losses);
-    if isnan(bestLoss) || bestLoss == lastBestLoss && all(step<=1)
+    assert(~isnan(bestLoss))
+    if bestLoss == lastBestLoss && all(step<=1)
         break
     end
     step = ceil(step/2);
     [best{1:nHypers}] = ind2sub(dims,visited(j));
     ix = [best{:}];
+    % visit all nodes 1 step away in every direction
     for b = 0:2^sum(pattern)-1
         s = step;
         s(pattern) = s(pattern).*(2*bitget(b,1:sum(pattern))-1);
         visit(ix+s)
     end
 end
-
 [~,j] = min(losses);
 [mix{1:nHypers}] = ind2sub(dims,visited(j));
 hypers = cellfun(@(h,ix) h(ix), searchSpace, mix);
@@ -74,8 +76,11 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
     function L = cvLoss(hypers,k)
         % compute cross-validation loss
         [XTrain,XTest] = cove.splitTrials(X,k,K);
-        [C, M] = cove.estimate(XTrain, [], evokedBins, covEstimation, hypers);
-        L = loss(C, cove.estimate(XTest, M, evokedBins,'sample', {}));
+        [R, M, V] = cove.estimate(XTrain, [], [], evokedBins, reg, hypers);
+        RTest = cove.estimate(XTest, M, V, evokedBins,...
+            setfield(reg,'cov_regularization','sample'),{});
+        N = sum(~isnan(XTest),3);
+        L = cove.vloss(R,RTest,V,N);
         if isnan(L)
             L = inf;
         end

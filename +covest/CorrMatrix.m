@@ -1,13 +1,13 @@
 %{
-covest.CovMatrix (computed) # regularized correlation matrix estimates
+covest.CorrMatrix (computed) # regularized correlation matrix estimates
 -> covest.ActiveCells
 -> covest.Method
 -> covest.Fold
 ---
-means                       : longblob                      # estimate of the means
-variances                   : longblob                      # estimate of variances
-corr_matrix                  : longblob                      # estimated covariance matrix
-test_matrix=null            : longblob                      # sample cov matrix from the testing set
+means                       : longblob                      # estimates of the mean
+variances                   : longblob                      # estimates of the variances
+corr_matrix                 : longblob                      # estimated covariance matrix
+test_z_cov=null             : longblob                      # cov matrix of z-score signals
 sparse=null                 : longblob                      # sparse component of the matrix
 lowrank=null                : longblob                      # low-rank component of matrix
 hypers=null                 : blob                          # values of hyperparameters
@@ -20,11 +20,12 @@ computing_time              : float                         # (s) time required 
 cm_ts=CURRENT_TIMESTAMP     : timestamp                     #
 %}
 
-classdef CovMatrix < dj.Relvar & dj.AutoPopulate
+classdef CorrMatrix < dj.Relvar & dj.AutoPopulate
     
     properties
         popRel  = covest.ActiveCells * covest.Traces * covest.Method * covest.Fold ...
-            & 'preprocess_method_num=5' & 'ndirs=2 || `condition`=0' & 'ncells>100'
+            & 'preprocess_method_num=5' & 'ndirs=2 || `condition`=0' & 'ncells>100' ...
+            & 'mean_regularization<>"none" || var_regularization<>"none"'
     end
     
     methods(Access=protected)
@@ -33,6 +34,7 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             t1 = tic;
             opt = fetch(covest.Method & key,'*');
             [k,nFolds] = fetch1(covest.Fold & key, 'k','nfolds');
+            loss = eval(opt.loss_fun);
             
             % X := nBins * nDirs * nTrials * nCells
             [X,selection] = fetch1(covest.Traces*covest.ActiveCells & key, ...
@@ -54,22 +56,18 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             [X, XTest] = cove.splitTrials(X,k,nFolds);
             
             % estimate hyperparameters (if any)
-            if ~any(cellfun(@length,opt.hyperparam_space)>1)
-                hypers = cell2mat(opt.hyperparam_space);
-            else
-                [hypers, key.visited, key.losses] = cove.crossEstimateHyper(X, evokedBins, ...
-                    opt, opt.hyperparam_space);
+            hypers = {};
+            if ~isempty(opt.hyperparam_space)
+                [hypers, key.visited, key.losses] = cove.crossEstimateHyper(X, evokedBins, loss, ...
+                    opt.regularization, opt.hyperparam_space);
             end
-            [R,M,V,extras] = cove.estimate(X, [], [], evokedBins, opt, hypers);
-            key.corr_matrix = R;
-            key.means = M;
-            key.variances = V;
+            [C,M,extras] = cove.estimate(X, [], evokedBins, opt.regularization, hypers);
+            
+            key.cov_matrix = C;
             if ~isempty(XTest)
-                RTest = cove.estimate(XTest,M,V,evokedBins,...
-                    setfield(opt,'cov_regularization','sample'),{});
-                key.test_matrix = RTest;
-                N = sum(~isnan(XTest),3);
-                key.cv_loss = cove.vloss(R,RTest,V,N);
+                CTest = cove.estimate(XTest,M,evokedBins, 'sample', {});
+                key.test_matrix = CTest;
+                key.cv_loss = loss(C,CTest);
             end
             if ~isempty(hypers)
                 key.hypers = hypers;
@@ -90,5 +88,5 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             key.computing_time = toc(t1);
             self.insert(key)
         end
-    end
+    end    
 end
