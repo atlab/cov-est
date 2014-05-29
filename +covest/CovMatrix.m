@@ -11,6 +11,7 @@ test_matrix=null            : longblob                      # sample cov matrix 
 sparse=null                 : longblob                      # sparse component of the matrix
 lowrank=null                : longblob                      # low-rank component of matrix
 hypers=null                 : blob                          # values of hyperparameters
+delta                       : float                         # variance regularization
 visited=null                : longblob                      # tested hyperparamter values
 losses=null                 : longblob                      # losses for tested hyperparameter values
 sparsity=0                  : float                         # fraction of zeros off-diagonal
@@ -56,23 +57,27 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             % estimate hyperparameters (if any)
             if ~any(cellfun(@length,opt.hyperparam_space)>1)
                 hypers = cell2mat(opt.hyperparam_space);
+                K = 10;  % inner-loop cross-validation
+                % find best delta (shrinkage of condition-specific variances toward common variance)
+                [XTest_,R_,M_,V_] = arrayfun(@(k) estimate_(hypers,k,K), 1:K, 'uni', false);
+                bestDelta = mean(cellfun(@(xt,R,M,V) ...
+                    cove.findBestDelta(xt,R,M,V), ...
+                    XTest_, R_, M_, V_));
             else
-                [hypers, key.visited, key.losses] = cove.crossEstimateHyper(X, evokedBins, ...
-                    opt, opt.hyperparam_space);
+                [hypers, bestDelta, key.visited, key.losses] = ...
+                    cove.crossEstimateHyper(X, evokedBins, ...
+                    opt.regularization, opt.hyperparam_space);
             end
-            [R,M,V,extras] = cove.estimate(X, [], [], evokedBins, opt, hypers);
+            [R,M,V,extras] = cove.estimate(X, evokedBins, opt.regularization, hypers);
             key.corr_matrix = R;
             key.means = M;
             key.variances = V;
-            if ~isempty(XTest)
-                RTest = cove.estimate(XTest,M,V,evokedBins,...
-                    setfield(opt,'cov_regularization','sample'),{});
-                key.test_matrix = RTest;
-                N = sum(~isnan(XTest),3);
-                key.cv_loss = cove.vloss(R,RTest,V,N);
-            end
+            key.delta = bestDelta;
             if ~isempty(hypers)
                 key.hypers = hypers;
+            end
+            if ~isempty(XTest)
+                key.cv_loss = cove.vloss(XTest, R, M, V, bestDelta);
             end
             if ~isempty(extras) && ~isempty(fieldnames(extras))
                 if isfield(extras,'loading_matrix')
@@ -89,6 +94,13 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             [~,key.host] = system('hostname');
             key.computing_time = toc(t1);
             self.insert(key)
+            
+            
+            function [XTest,R,M,V] = estimate_(hypers,k,K)
+                % compute cross-validation loss
+                [XTrain,XTest] = cove.splitTrials(X,k,K);
+                [R, M, V] = cove.estimate(XTrain, evokedBins, opt.regularization, hypers);
+            end
         end
     end
 end

@@ -1,4 +1,4 @@
-function [hypers, visited, losses] = crossEstimateHyper(X, evokedBins, reg, searchSpace)
+function [hypers, bestDelta, visited, losses] = crossEstimateHyper(X, evokedBins, reg, searchSpace)
 % find the values of hyperparamters that minimize the cross-validated loss
 % by K-fold cross-validation.
 %
@@ -19,7 +19,6 @@ assert(nHypers>0)
 
 visited = [];  % visited indices
 losses =  [];  % measured losses at visited indices
-K = 10;        % K-fold cross-validation
 
 % coarse random search to seed the local search
 fprintf 'random search: '
@@ -52,37 +51,37 @@ while true
     end
 end
 [~,j] = min(losses);
-[mix{1:nHypers}] = ind2sub(dims,visited(j));
-hypers = cellfun(@(h,ix) h(ix), searchSpace, mix);
+[indices{1:nHypers}] = ind2sub(dims,visited(j));
+hypers = cellfun(@(h,ix) h(ix), searchSpace, indices);
 fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
 
 
     function visit(ix)
         % visit a point on the search space specified by ix
         % but return if already visited
+
+        K = 10;        % K-fold cross-validation
+
         ix = num2cell(max(1,min(dims,ix)));
         hypers_ = cellfun(@(x,i) x(i), searchSpace, ix);
         ix = sub2ind([dims ones(1,2-length(dims))],ix{:});
         alreadyVisited = ismember(ix,visited);
         if ~alreadyVisited
             fprintf('%2.4g  ', hypers_)
-            visited(end+1) = ix;
-            losses(end+1) = mean(arrayfun(@(k) cvLoss(hypers_,k), 1:K));
+            [XTest,R,M,V] = arrayfun(@(k) estimate_(hypers_,k,K), 1:K, 'uni', false);
+            delta = mean(cellfun(@(XTest,R,M,V) cove.findBestDelta(XTest, R, M, V), XTest, R, M, V));
+            visited(end+1) = ix; 
+            losses(end+1) = mean(cellfun(@(XTest,R,M,V) cove.vloss(XTest,R,M,V,delta), XTest, R, M, V));
+            if losses(end)==min(losses)
+                bestDelta = delta;
+            end
             fprintf(':  mean loss %g\n', losses(end))
         end
     end
 
-
-    function L = cvLoss(hypers,k)
+    function [XTest,R,M,V] = estimate_(hypers,k,K)
         % compute cross-validation loss
         [XTrain,XTest] = cove.splitTrials(X,k,K);
-        [R, M, V] = cove.estimate(XTrain, [], [], evokedBins, reg, hypers);
-        RTest = cove.estimate(XTest, M, V, evokedBins,...
-            setfield(reg,'cov_regularization','sample'),{});
-        N = sum(~isnan(XTest),3);
-        L = cove.vloss(R,RTest,V,N);
-        if isnan(L)
-            L = inf;
-        end
+        [R, M, V] = cove.estimate(XTrain, evokedBins, reg, hypers);        
     end
 end

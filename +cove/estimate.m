@@ -1,14 +1,11 @@
-function [R, M, V, extras] = estimate(X, M, V, evokedBins, reg, hypers)
+function [R, M, V, extras] = estimate(X, evokedBins, reg, hypers)
 % estimate covariance matrix C
 %
 % Input:
 %    X - data: nBins * nConds * nTrials * nCells
-%    M - mean responses if computed from another dataset (see below)
-%    V - variances if computed from anoter dataset (see below)
 %    evokedBins - the number of bins considered in the evoked response,
 %    whereas the remaning bins are considered to be spontaneous
-%    reg - structure specifying regularization of means, variances, and
-%    correlations
+%    reg - covariance regularization method
 %
 % Output:
 %    R  - correlation matrix
@@ -22,64 +19,39 @@ extras = struct;
 evokedBins = min(size(X,3),evokedBins);
 
 % estimate mean response
-if isempty(M)
-    
-    % bin-specific means
-    M = nanmean(X(1:evokedBins,:,:,:),3);   % binwise mean of evoked response
-    if evokedBins < size(X,1)
-        % common mean during spontaneous activity
-        M2 = reshape(nanmean(reshape(X(evokedBins+1:end,:,:,:),[],nCells)),1,1,1,nCells);  % common mean in intertrial periods
-        M2 = repmat(M2,size(X,1)-evokedBins,nConds);
-        M = cat(1,M,M2);
-    end
-    
+% bin-specific means
+M = nanmean(X(1:evokedBins,:,:,:),3);   % binwise mean of evoked response
+if evokedBins < size(X,1)
+    % common mean during spontaneous activity
+    M2 = reshape(nanmean(reshape(X(evokedBins+1:end,:,:,:),[],nCells)),1,1,1,nCells);  % common mean in intertrial periods
+    M2 = repmat(M2,size(X,1)-evokedBins,nConds);
+    M = cat(1,M,M2);
 end
 
 % subtract mean
 X = bsxfun(@minus, X, M);
 
-localV = isempty(V);
-if localV
-    
-    % bin-specific means
-    V = nanvar(X(1:evokedBins,:,:,:),[],3);   % binwise mean of evoked response
-    if evokedBins < size(X,1)
-        % common variance during spontaneous activity
-        V2 = reshape(nanvar(reshape(X(evokedBins+1:end,:,:,:),[],nCells)),1,1,1,nCells);  % common mean in intertrial periods
-        V2 = repmat(V2,size(X,1)-evokedBins,nConds);
-        V = cat(1,V,V2);
-    end
-    
-    % regularization of the bin-specific means toward the global mean
-    V0 = reshape(nanvar(reshape(X,nBins*nConds*nTrials,nCells)),[1 1 1 nCells]);
-    switch reg.var_regularization
-        case ''
-            V = bsxfun(@plus,V*0,V0);  % by default assume common variance
-        case 'L2'
-            assert(length(hypers)>=1, 'variance regularization requires a hyperparameter value')
-            V = V + hypers(1)*(bsxfun(@minus,V0,V));
-            hypers = hypers(2:end);
-        otherwise
-            error 'invalid variance regularization'
-    end
+% estimate binwise variances
+V = nanvar(X(1:evokedBins,:,:,:),1,3);   % binwise mean of evoked response
+if evokedBins < size(X,1)
+    % common variance during spontaneous activity
+    V2 = reshape(nanvar(reshape(X(evokedBins+1:end,:,:,:),[],nCells),1),1,1,1,nCells);  % common mean in intertrial periods
+    V2 = repmat(V2,size(X,1)-evokedBins,nConds);
+    V = cat(1,V,V2);
 end
 
 % sample correlation matrix based on bin-wise variances
 Z = bsxfun(@rdivide, X, sqrt(V));
 R = cove.cov(reshape(Z,[],nCells));
-if localV
-    V = bsxfun(@times, V, reshape(diag(R),1,1,1,nCells));
-    Z = bsxfun(@rdivide, X, sqrt(V));
-    R = cove.cov(reshape(Z,[],nCells));
-    assert(~localV || all(abs(diag(R)-1)<1e-3))
-end
+assert(all(abs(diag(R)-1)<1e-3))
+R = corrcov(R);  % just in case
 
 % average variances across all bins and produce the average
 % sample covariance matrix, C
 sigma = diag(sqrt(mean(reshape(V,[],nCells))));  % average variances
 C = sigma*R*sigma;
 
-switch reg.cov_regularization
+switch reg
     case 'sample'
         assert(isempty(hypers),'invalid hyperparameters')
         % do nothing
@@ -128,7 +100,7 @@ end
 % convert back to correlations
 R = sigma\C/sigma;
 
-if ~strcmp(reg.cov_regularization,'sample')
+if ~strcmp(reg,'sample')
     % transfer the change in variance from R to V
     V = bsxfun(@times, V, reshape(diag(R), [1 1 1 nCells])); 
     R = corrcov(R);
