@@ -5,7 +5,9 @@ classdef plots
     
     properties(Constant)
         figPath = '~/cov/figures/src/'
-        exampleSite = 'mod(aod_scan_start_time,10000)=4328 && high_repeats'
+%        exampleSite = 'mod(aod_scan_start_time,10000)=4328 && high_repeats'
+        exampleSite = 'mod(aod_scan_start_time,10000)=2031 && high_repeats'
+%        exampleSite = 'mod(aod_scan_start_time,10000)=5859 && high_repeats'
     end
     
     methods(Static)
@@ -204,7 +206,7 @@ classdef plots
             % panel C
             fig = Figure(1,'size',[35 32]);
             
-            C = fetch1(covest.CovMatrix & covest.plots.exampleSite & 'method=0' & 'nfolds=1','cov_matrix');
+            C = fetch1(covest.CovMatrix & covest.plots.exampleSite & 'method=0' & 'nfolds=1','corr_matrix');
             p = size(C,1);
             C = corrcov(C);
             imagesc(C,.1*[-1 1]);
@@ -242,17 +244,17 @@ classdef plots
                 switch f{1}
                     case {'Fig3','Supp4'}
                         pairs = {
-                            0   90    'sample'
-                            10  90    'diag'
-                            30  90    'factor'
-                            80  90    'sparse'
+                            0   100    'sample'
+                            10  100    'diag'
+                            30  100    'factor'
+                            80  100    'sparse'
                             };
                     case 'Supp3'
                         pairs = {
                             0   80    'sample'
                             10  80    'diag'
                             30  80    'factor'
-                            90  80    sprintf('sparse\n+latent')
+                            100 80    sprintf('sparse\n+latent')
                             };
                     otherwise
                         error 'unknown figure'
@@ -391,22 +393,25 @@ classdef plots
         end
         
         
-        function network
+        function network(doFragment,doCorr)
             % figures 4E, 4G, H,a and I
             
             clf
+            if ~nargin
+                doCorr = false; % when true, plot thresholded correlations in the fragment
+                doFragment = false; % when true, only plot a small fragment inside the cluser
+            end
+
             
             doInteractions = true;  % true=plot interactions, false=only cells
-            doCorr = true; % when true, plot thresholded correlations in the fragment
-            doFragment = true;
             doFragment = doFragment || doCorr;
             
             % figure 4-G,H,I
             alpha = 0.05;  % tuning signficance levels
             zref = 200;  % cortical depth of the center of the scan
-            xoffset = -30;
-            yoffset = -26;
-            zoffset = 22;
+            xoffset = -10;
+            yoffset = -10;
+            zoffset = -30;
             
             zticks = 100:50:300;
             xticks = -200:50:200;
@@ -593,8 +598,8 @@ classdef plots
             fname = fullfile(covest.plots.figPath, 'Fig5-D.eps');
             fig = Figure(1,'size',[40 40]);
             c = covest.CovMatrix & 'nfolds=1';
-            c0 = c.pro('method->m0','cov_matrix->c1');
-            c1 = c.pro('method->m1','cov_matrix->c2','sparse');
+            c0 = c.pro('method->m0','corr_matrix->c1');
+            c1 = c.pro('method->m1','corr_matrix->c2','sparse');
             [C0,C1,S1,hix2] = fetchn(c0*c1 & 'm0=0' & 'm1=90', ...
                 'c1', 'c2', 'sparse', '(mod(aod_scan_start_time,10000)=4328)->highlight');
             hix2 = find(hix2);
@@ -680,10 +685,10 @@ classdef plots
             % Figure 6, panels B, C, E, F
             for vertical = [false true]  % false = panels B, D,  false = C, F
                 c = covest.CovMatrix & 'nfolds=1';
-                c0 = c.pro('method->m0','cov_matrix->c0') & 'm0=0';
-                c1 = c.pro('method->m1','cov_matrix','sparse') & 'm1=90';
+                c0 = c.pro('method->m0','corr_matrix->c0') & 'm0=0';
+                c1 = c.pro('method->m1','corr_matrix','sparse') & 'm1=90';
                 rel = c0*c1*covest.Traces*covest.ActiveCells;
-                [xyz,selection,C0,C1,S] = rel.fetchn('cell_xyz','selection','c0','cov_matrix','sparse');
+                [xyz,selection,C0,C1,S] = rel.fetchn('cell_xyz','selection','c0','corr_matrix','sparse');
                 
                 % remove invactive cells
                 xyz = cellfun(@(xyz,selection) xyz(selection,:), xyz, selection, 'uni', false);
@@ -839,10 +844,10 @@ classdef plots
             
             % get all data
             c = covest.CovMatrix & 'nfolds=1';
-            c0 = c.pro('method->m0', 'cov_matrix->c0') & 'm0=0';
-            c1 = c.pro('method->m1','sparse','cov_matrix') & 'm1=90';
+            c0 = c.pro('method->m0', 'corr_matrix->c0') & 'm0=0';
+            c1 = c.pro('method->m1','sparse','corr_matrix') & 'm1=90';
             rel = c0*c1*covest.ActiveCells*pro(covest.OriTuning,'high_repeats->hrepeats','*');
-            [pval,ori,selection,C0,C1,S] = rel.fetchn('von_p_value','von_pref','selection','c0','cov_matrix','sparse');
+            [pval,ori,selection,C0,C1,S] = rel.fetchn('von_p_value','von_pref','selection','c0','corr_matrix','sparse');
             
             % remove inactive cells
             ori = cellfun(@(ori,selection) ori(selection)*180/pi, ori, selection,'uni',false);

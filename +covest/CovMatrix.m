@@ -77,6 +77,7 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
                 key.hypers = hypers;
             end
             if ~isempty(XTest)
+                key.test_matrix = XTest;
                 key.cv_loss = cove.vloss(XTest, R, M, V, bestDelta);
             end
             if ~isempty(extras) && ~isempty(fieldnames(extras))
