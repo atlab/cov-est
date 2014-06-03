@@ -73,6 +73,7 @@ switch reg
         [L,psi] = cove.factor(C,hypers(2));  % factor analysis
         extras.loading_matrix = L;
         extras.indep_vars = psi(:);
+        C = L*L' + diag(psi);
         
     case 'glasso'
         assert(length(hypers)==1)
@@ -102,6 +103,6 @@ R = sigma\C/sigma;
 
 if ~strcmp(reg,'sample')
     % transfer the change in variance from R to V
-    V = bsxfun(@times, V, reshape(diag(R), [1 1 1 nCells])); 
+    V = bsxfun(@times, V, reshape(diag(R), [1 1 1 nCells]));
     R = corrcov(R);
 end

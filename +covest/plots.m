@@ -5,48 +5,43 @@ classdef plots
     
     properties(Constant)
         figPath = '~/cov/figures/src/'
-%        exampleSite = 'mod(aod_scan_start_time,10000)=4328 && high_repeats'
+        %        exampleSite = 'mod(aod_scan_start_time,10000)=4328 && high_repeats'
         exampleSite = 'mod(aod_scan_start_time,10000)=2031 && high_repeats'
-%        exampleSite = 'mod(aod_scan_start_time,10000)=5859 && high_repeats'
+        %        exampleSite = 'mod(aod_scan_start_time,10000)=5859 && high_repeats'
     end
     
     methods(Static)
         
         
         function supp2pre
-            loss = @(S,Sigma)(trace(Sigma/S)+cove.logDet(S))/size(S,1);
-            
             
             % X := nBins * nDirs * nTrials * nCells
             [X,selection] = fetch1(covest.Traces*covest.ActiveCells & covest.plots.exampleSite, ...
                 'trace_segments', 'selection');
             X = double(X(:,:,:,selection));
-            Xsaved = X;
             
-            [hypers, evokedBins] = fetch1(...
+            [hypers, evokedBins,delta] = fetch1(...
                 covest.Traces*covest.CovMatrix & covest.plots.exampleSite ...
-                & 'method=90' & 'nFolds = 1','hypers','evoked_bins');
+                & 'method=90' & 'nFolds = 1','hypers','evoked_bins','delta');
             
             nFolds = 10;
             cvloss = nan(41,41,nFolds);
             [alpha,beta] = ndgrid(...
-                hypers(2)*exp(linspace(-1,1,size(cvloss,1))), ...
-                hypers(3)*exp(linspace(-1,1,size(cvloss,2))));
+                hypers(1)*exp(linspace(-1,1,size(cvloss,1))), ...
+                hypers(2)*exp(linspace(-1,1,size(cvloss,2))));
             sparsity = nan(size(alpha));
             nLatent = nan(size(alpha));
             for iAlpha = 1:size(cvloss,1)
                 for iBeta = 1:size(cvloss,2)
-                    hypers(2) = alpha(iAlpha,iBeta);
-                    hypers(3) = beta(iAlpha,iBeta);
+                    hypers(1) = alpha(iAlpha,iBeta);
+                    hypers(2) = beta(iAlpha,iBeta);
                     fprintf('%02d-%02d ',iAlpha,iBeta)
-                    for k=1:nFolds
-                        [X, XTest] = cove.splitTrials(Xsaved,k,nFolds);
-                        [C,M,V] = cove.estimate(X, [], [], evokedBins, 'lv-glasso', hypers);
-                        CTest = cove.estimate(XTest,M,V,evokedBins, 'sample', []);
-                        cvloss(iAlpha,iBeta,k) = loss(C,CTest);
-                        fprintf .
-                    end
-                    [~,~,extras] = cove.estimate(Xsaved, [], [], evokedBins, 'lv-glasso', hypers);
+                    [XTest_,R_,M_,V_] = arrayfun(@(k) estimate_(hypers,k,nFolds), 1:nFolds, 'uni', false);
+                    cvloss(iAlpha, iBeta,:) = ...
+                        cellfun(@(XTest,R,M,V) ...
+                        cove.vloss(XTest, R, M, V, delta), ...
+                        XTest_, R_, M_, V_);                    
+                    [~,~,~,extras] = cove.estimate(X, evokedBins, 'lv-glasso', hypers);
                     sparsity(iAlpha,iBeta) = cove.sparsity(extras.S);
                     nLatent(iAlpha,iBeta) = size(extras.H,2);
                     fprintf(' sparsity %1.3f  nLatent %3d\n', ...
@@ -54,6 +49,12 @@ classdef plots
                 end
             end
             save ~/comment4v4
+            
+            function [XTest,R,M,V] = estimate_(hypers,k,K)
+                % compute cross-validation loss
+                [XTrain,XTest] = cove.splitTrials(X,k,K);
+                [R, M, V] = cove.estimate(XTrain, evokedBins, 'lv-glasso', hypers);
+            end
         end
         
         
@@ -244,17 +245,17 @@ classdef plots
                 switch f{1}
                     case {'Fig3','Supp4'}
                         pairs = {
-                            0   100    'sample'
-                            10  100    'diag'
-                            30  100    'factor'
-                            80  100    'sparse'
+                            0   90    'sample'
+                            10  90    'diag'
+                            30  90    'factor'
+                            80  90    'sparse'
                             };
                     case 'Supp3'
                         pairs = {
                             0   80    'sample'
                             10  80    'diag'
                             30  80    'factor'
-                            100 80    sprintf('sparse\n+latent')
+                            90 80    sprintf('sparse\n+latent')
                             };
                     otherwise
                         error 'unknown figure'
@@ -360,7 +361,7 @@ classdef plots
                 axis xy
                 axis square
                 hold on
-                PlotAxisAtOrigin(axisAlphas)
+               PlotAxisAtOrigin(axisAlphas)
                 hold off
                 set(gcf,'PaperUnits','centimeters','PaperPosition',[0 0 3.5 3.5],...
                     'PaperSize',[3.5 3.5])
@@ -401,7 +402,7 @@ classdef plots
                 doCorr = false; % when true, plot thresholded correlations in the fragment
                 doFragment = false; % when true, only plot a small fragment inside the cluser
             end
-
+            
             
             doInteractions = true;  % true=plot interactions, false=only cells
             doFragment = doFragment || doCorr;
@@ -411,7 +412,7 @@ classdef plots
             zref = 200;  % cortical depth of the center of the scan
             xoffset = -10;
             yoffset = -10;
-            zoffset = -30;
+            zoffset = -10;
             
             zticks = 100:50:300;
             xticks = -200:50:200;
@@ -535,6 +536,11 @@ classdef plots
             set(gca,'XTick',xticks,'YTick',yticks)
             campan(panx,pany)
             set(gca,'fontsize',8,'linewidth',0.25,'TickLength',get(gca,'TickLength')*0.75)
+            if doFragment
+                xlim(xoffset+[-1 1]*fragmentRadius)
+                ylim(yoffset+[-1 1]*fragmentRadius)
+                zlim(zoffset+zref+[-1 1]*fragmentRadius)
+            end
             
             set(gcf,'PaperUnits','centimeters','PaperSize',paperSize,'PaperPosition',[0 0 paperSize])
             print('-dpdf','-r800',fname)
@@ -544,7 +550,7 @@ classdef plots
         function fig5
             % panel A:  #latent vs #neurons
             [L,S,nCells,highlight] = fetchn(covest.CovMatrix*covest.ActiveCells & 'method=90' & 'nfolds=1', ...
-                'lowrank', 'sparse', 'ncells', '(mod(aod_scan_start_time,10000)=4328)->highlight');
+                'lowrank', 'sparse', 'ncells', '(mod(aod_scan_start_time,10000)=2031)->highlight');
             fname = fullfile(covest.plots.figPath, 'Fig5-A.eps');
             fig = Figure(1,'size',[40 40]);
             
@@ -601,7 +607,7 @@ classdef plots
             c0 = c.pro('method->m0','corr_matrix->c1');
             c1 = c.pro('method->m1','corr_matrix->c2','sparse');
             [C0,C1,S1,hix2] = fetchn(c0*c1 & 'm0=0' & 'm1=90', ...
-                'c1', 'c2', 'sparse', '(mod(aod_scan_start_time,10000)=4328)->highlight');
+                'c1', 'c2', 'sparse', '(mod(aod_scan_start_time,10000)=2031)->highlight');
             hix2 = find(hix2);
             m0 = cellfun(@cove.avgCorr, C0);
             m1 = -cellfun(@(C) cove.avgCorr(inv(C)), C1);
@@ -686,7 +692,7 @@ classdef plots
             for vertical = [false true]  % false = panels B, D,  false = C, F
                 c = covest.CovMatrix & 'nfolds=1';
                 c0 = c.pro('method->m0','corr_matrix->c0') & 'm0=0';
-                c1 = c.pro('method->m1','corr_matrix','sparse') & 'm1=90';
+                c1 = c.pro('method->m1','corr_matrix','sparse') & 'm1=100';
                 rel = c0*c1*covest.Traces*covest.ActiveCells;
                 [xyz,selection,C0,C1,S] = rel.fetchn('cell_xyz','selection','c0','corr_matrix','sparse');
                 
@@ -1085,7 +1091,7 @@ classdef plots
             xlim(xlim.*[0 1])
             xlabel '\Delta avg corr'
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp1C.eps'))            
+            fig.save(fullfile(covest.plots.figPath,'Supp1C.eps'))
             
         end
     end
@@ -1165,3 +1171,5 @@ if nargout>1
     n = sum(~isnan(offDiag(C)));
 end
 end
+
+
