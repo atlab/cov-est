@@ -2,10 +2,14 @@
 covest.QuadLoss (computed) # my newest table
 -> covest.CovMatrix
 -----
-quad_loss  :  double   #  quadratic loss value
+quad_loss=null  :  double   #  quadratic loss value
 %}
 
 classdef QuadLoss < dj.Relvar & dj.AutoPopulate
+    
+    properties(Constant)
+        loss = @(S,Sigma) trace(Sigma/S-eye(size(S,1)))/size(S,1)^2;
+    end
     
     properties
         popRel  = covest.CovMatrix & 'nfolds>1'
@@ -16,12 +20,12 @@ classdef QuadLoss < dj.Relvar & dj.AutoPopulate
         function makeTuples(self, key)
             opt = fetch(covest.Method & key,'*');
             [k,nFolds] = fetch1(covest.Fold & key, 'k','nfolds');
-            loss = @(S,Sigma) trace(Sigma/S-eye(size(S,1)))/size(S,1)^2;
             
             % X := nBins * nDirs * nTrials * nCells
             [X,selection] = fetch1(covest.Traces*covest.ActiveCells & key, ...
                 'trace_segments', 'selection');
             X = double(X(:,:,:,selection));
+            [nBins, nDirs, nTrials, nCells] = size(X);
             
             % exclude spontaneous activity if necessary
             evokedBins = fetch1(covest.Traces & key, 'evoked_bins');
@@ -35,10 +39,19 @@ classdef QuadLoss < dj.Relvar & dj.AutoPopulate
             end
             
             % split into training and testing
-            C = fetch1(covest.CovMatrix & key, 'cov_matrix');
+            [M,V,R,delta] = fetch1(covest.CovMatrix & key, ...
+                'means','variances','corr_matrix','delta');
             [~, XTest] = cove.splitTrials(X,k,nFolds);
-            CTest = cove.estimate(XTest,[],evokedBins, 'sample', {});
-            key.quad_loss = loss(C,CTest);
+            assert(~isempty(XTest))
+            X = bsxfun(@minus, X, M);            
+            V0 = reshape(nanmean(reshape(V,[],nCells)),[1 1 1 nCells]);
+            V = bsxfun(@plus,(1-delta)*V,delta*V0);
+            X = bsxfun(@rdivide, X, sqrt(V));
+            RTest = cov(reshape(X,[],nCells));
+            
+            
+            
+            key.quad_loss = self.loss(R,RTest);
             self.insert(key)
         end
     end

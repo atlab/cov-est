@@ -85,7 +85,7 @@ switch reg
         
     case 'lv-glasso'
         assert(length(hypers)==2)
-        cove.set('max_latent',inf)   % prevent latent variables
+        cove.set('max_latent',inf)   % allow any number of latent variables
         scale = mean(diag(C));
         extras = cove.lvglasso(C/scale,hypers(1),hypers(2),cove.set);
         extras.S = extras.S/scale;  % scale back
