@@ -1,12 +1,12 @@
 %{
-covest.Fold (lookup) # my newest table
+sim.Fold (lookup) # my newest table
 k      :   tinyint   # kth fold
 nfolds :   tinyint   # total folds
 -----
-
 %}
 
-classdef Fold < dj.Relvar    
+classdef Fold < dj.Relvar
+     
     methods
         function fill(self)
             self.inserti({1 1});

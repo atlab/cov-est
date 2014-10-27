@@ -4,7 +4,7 @@ function [hypers, bestDelta, visited, losses] = crossEstimateHyper(X, evokedBins
 %
 % INPUTS:
 %     X = nBins * nDirs * nTrials * nCells
-%     covEstimation -  string identifying the method for estimating the variance
+%     evoked bins - number of bins in each trial that are driven by stimulus
 %     reg - structure specifying regularization of means, variances, and correlations
 %     searchSpace - lists of valid values for each hyperparameter, in sequence
 %
@@ -59,9 +59,8 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
     function visit(ix)
         % visit a point on the search space specified by ix
         % but return if already visited
-
+        
         K = 10;        % K-fold cross-validation
-
         ix = num2cell(max(1,min(dims,ix)));
         hypers_ = cellfun(@(x,i) x(i), searchSpace, ix);
         ix = sub2ind([dims ones(1,2-length(dims))],ix{:});
@@ -69,8 +68,13 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
         if ~alreadyVisited
             fprintf('%2.4g  ', hypers_)
             [XTest,R,M,V] = arrayfun(@(k) estimate_(hypers_,k,K), 1:K, 'uni', false);
-            delta = mean(cellfun(@(XTest,R,M,V) cove.findBestDelta(XTest, R, M, V), XTest, R, M, V));
-            visited(end+1) = ix; 
+            visited(end+1) = ix;
+            if size(X,2)==1 && size(X,1)==1
+                delta = 0;
+            else
+                % if multiple conditions, regularize variance estimate
+                delta = mean(cellfun(@(XTest,R,M,V) cove.findBestDelta(XTest, R, M, V), XTest, R, M, V));
+            end
             losses(end+1) = mean(cellfun(@(XTest,R,M,V) cove.vloss(XTest,R,M,V,delta), XTest, R, M, V));
             if losses(end)==min(losses)
                 bestDelta = delta;
@@ -82,6 +86,6 @@ fprintf('final hyperparameters: %s\n', sprintf(' %g', hypers))
     function [XTest,R,M,V] = estimate_(hypers,k,K)
         % compute cross-validation loss
         [XTrain,XTest] = cove.splitTrials(X,k,K);
-        [R, M, V] = cove.estimate(XTrain, evokedBins, reg, hypers);        
+        [R, M, V] = cove.estimate(XTrain, evokedBins, reg, hypers);
     end
 end

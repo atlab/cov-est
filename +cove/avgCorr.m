@@ -1,6 +1,7 @@
 function m = avgCorr(C)
 % mean correlation coefficient
-p = size(C,1);
-C = corrcov(C);
-[i,j] = ndgrid(1:p,1:p);
+[rows,cols] = size(C);
+assert(rows==cols);
+%C = corrcov(C);
+[i,j] = ndgrid(1:rows,1:cols);
 m = mean(C(i<j));

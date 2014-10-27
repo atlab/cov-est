@@ -15,10 +15,12 @@ classdef TrueLoss < dj.Relvar & dj.AutoPopulate
         
         function makeTuples(self, key)
             loss = @(C,trueC) (trace(trueC/C)+cove.logDet(C))/size(C,1);
-            [trueC,C] = fetch1(pro(sim.Truth,'true_cov')*sim.CovMatrix & key, 'true_cov', 'cov_matrix');
-            key.true_loss = loss(C,trueC)-loss(trueC,trueC);
+            [trueC,R,V] = fetch1(pro(sim.Truth,'true_cov')*sim.CovMatrix & key, ...
+                'true_cov', 'corr_matrix','variances');
+            V = diag(sqrt(V(:)));
+            key.true_loss = loss(V*R*V,trueC)-loss(trueC,trueC);
             self.insert(key)
         end
     end
     
-end
+end 

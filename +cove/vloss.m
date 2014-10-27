@@ -17,8 +17,10 @@ assert(all(size(N)==size(V)))
 XTest = bsxfun(@minus, XTest, M);
 
 % shrink the variance estimates toward the mean variance across all conditions
-V0 = reshape(nanmean(reshape(V,[],p)),[1 1 1 p]);
-V = bsxfun(@plus,(1-delta)*V,delta*V0);
+if delta
+    V0 = reshape(nanmean(reshape(V,[],p),1),[1 1 1 p]);
+    V = bsxfun(@plus,(1-delta)*V,delta*V0);
+end
 
 % normalize by regularized variance
 Z = bsxfun(@rdivide, XTest, sqrt(V));

@@ -21,7 +21,6 @@ classdef Method < dj.Relvar
             
             10  1 0  'diag'      {exp(-6:0.05:-1) exp(-4:0.05:0)}
             30  1 0  'factor'    {exp(-6:0.05:-1) 0:70}
-            40  1 0  'factor'    {0:70 exp(-6:0.05:-1)}
             80  1 0  'glasso'    {exp(-5:0.05:-1)}
             90  1 0  'lv-glasso' {exp(-7:.05:-1) exp(-5:.05:-1)}
             

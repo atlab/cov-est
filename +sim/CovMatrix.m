@@ -1,11 +1,12 @@
 %{
-sim.CovMatrix (computed) # estimate of simulated covariance matrix. See also: covest.CovMatrix
+sim.CovMatrix(computed) # estimate of simulated covariance matrix. See also: covest.CovMatrix
 -> sim.Sample
 -> sim.Method
--> covest.Fold
+-> sim.Fold
 ---
-cov_matrix                  : longblob                      # estimated covariance matrix
-test_matrix=null            : longblob                      # sample cov matrix from the testing set
+means                       : longblob                      # estimate of the means
+variances                   : longblob                      # estimate of variances
+corr_matrix                 : longblob                      # estimated covariance matrix
 sparse=null                 : longblob                      # sparse component of the matrix
 lowrank=null                : longblob                      # low-rank component of matrix
 hypers=null                 : blob                          # values of hyperparameters
@@ -21,7 +22,7 @@ cm_ts=CURRENT_TIMESTAMP     : timestamp                     #
 classdef CovMatrix < dj.Relvar & dj.AutoPopulate
     
     properties
-        popRel  =  sim.Sample*sim.Method*covest.Fold
+        popRel  =  sim.Sample*sim.Method*sim.Fold
     end
     
     methods(Access=protected)
@@ -29,8 +30,7 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
         function makeTuples(self, key)
             t1 = tic;
             opt = fetch(sim.Method & key,'*');
-            [k,nFolds] = fetch1(covest.Fold & key, 'k','nfolds');
-            loss = eval(opt.loss_fun);
+            [k,nFolds] = fetch1(sim.Fold & key, 'k','nfolds');
             
             % X := nBins * nDirs * nTrials * nCells
             X = fetch1(sim.Sample & key, 'sample_data');
@@ -41,21 +41,24 @@ classdef CovMatrix < dj.Relvar & dj.AutoPopulate
             [X, XTest] = cove.splitTrials(X,k,nFolds);
             
             % estimate hyperparameters (if any)
-            hypers = {};
-            if ~isempty(opt.hyperparam_space)
-                [hypers, key.visited, key.losses] = cove.crossEstimateHyper(X, 1, loss, ...
+            if ~any(cellfun(@length,opt.hyperparam_space)>1)
+                % hyperparameter values are known
+                hypers = cell2mat(opt.hyperparam_space);
+            else
+                % optimize hyperparameters
+                [hypers, ~, key.visited, key.losses] = ...
+                    cove.crossEstimateHyper(X, 1, ...
                     opt.regularization, opt.hyperparam_space);
             end
-            [C,~,extras] = cove.estimate(X, 0, 1, opt.regularization, hypers);
-            
-            key.cov_matrix = C;
-            if ~isempty(XTest)
-                CTest = cove.estimate(XTest, 0, 1, 'sample', {});
-                key.test_matrix = CTest;
-                key.cv_loss = loss(C,CTest);
-            end
+            [R,M,V,extras] = cove.estimate(X, 1, opt.regularization, hypers);
+            key.corr_matrix = R;
+            key.means = M;
+            key.variances = V;
             if ~isempty(hypers)
                 key.hypers = hypers;
+            end
+            if ~isempty(XTest)
+                key.cv_loss = cove.vloss(XTest, R, M, V, 0);
             end
             if ~isempty(extras) && ~isempty(fieldnames(extras))
                 if isfield(extras,'loading_matrix')

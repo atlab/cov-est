@@ -82,7 +82,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(1),hypers(2),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp1-A.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-A.eps'))
             
             fig = Figure(1,'size',[80 70]);
             
@@ -104,7 +104,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(1),hypers(2),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp1-B.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-B.eps'))
             
             
             fig = Figure(1,'size',[80 70]);
@@ -125,7 +125,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(1),hypers(2),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp1-C.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-C.eps'))
             
             
             fig = Figure(1,'size',[80 70]);
@@ -145,7 +145,7 @@ classdef plots
             ylabel '# latent'
             ylim([0 110])
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp1-D.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp2-D.eps'))
         end
         
         
@@ -250,7 +250,7 @@ classdef plots
         
         
         function fig3
-            for f = {'Fig3','Supp2','Supp3'}
+            for f = {'Fig3','Supp3','Supp4'}
                 switch f{1}
                     case {'Fig3','Supp3'}
                         pairs = {
@@ -259,7 +259,7 @@ classdef plots
                             30  90    'factor'
                             80  90    'sparse'
                             };
-                    case 'Supp2'
+                    case 'Supp4'
                         pairs = {
                             0   80    'sample'
                             10  80    'diag'
@@ -270,7 +270,7 @@ classdef plots
                         error 'unknown figure'
                 end
                 ticks = 0:0.01:1;
-                if any(strcmp(f{1},{'Fig3','Supp2'}))
+                if any(strcmp(f{1},{'Fig3','Supp4'}))
                     c = covest.CovMatrix & 'nfolds>1';
                     c1 = pro(c, 'method->m1','cv_loss->l1');
                     c2 = pro(c, 'method->m2','cv_loss->l2');
@@ -867,9 +867,9 @@ classdef plots
             C0 = C0(hasEnough);
             C1 = C1(hasEnough);
             S = S(hasEnough);
-            avgC0 = avgC0(hasEnough);
-            avgC1 = avgC1(hasEnough);
-            avgConn = avgConn(hasEnough);
+            %avgC0 = avgC0(hasEnough);
+            %avgC1 = avgC1(hasEnough);
+            %avgConn = avgConn(hasEnough);
             clear hasEnough
             
             % panel A: average correlations vs ori tuning

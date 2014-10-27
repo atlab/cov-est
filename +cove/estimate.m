@@ -44,7 +44,7 @@ end
 Z = bsxfun(@rdivide, X, sqrt(V));
 R = cove.cov(reshape(Z,[],nCells));
 assert(all(abs(diag(R)-1)<1e-3))
-R = corrcov(R);  % just in case
+R = corrcov(R,true);  % just in case
 
 % average variances across all bins and produce the average
 % sample covariance matrix, C
