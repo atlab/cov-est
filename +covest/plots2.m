@@ -82,7 +82,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(1),hypers(2),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp2-A.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp1-A.eps'))
             
             fig = Figure(1,'size',[80 70]);
             
@@ -104,7 +104,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(1),hypers(2),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp2-B.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp1-B.eps'))
             
             
             fig = Figure(1,'size',[80 70]);
@@ -125,7 +125,7 @@ classdef plots
                 'YTick',yticks,'YTickLabel',nozero(yticks))
             hold on, plot(hypers(1),hypers(2),'r+','MarkerSize',30), hold off
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp2-C.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp1-C.eps'))
             
             
             fig = Figure(1,'size',[80 70]);
@@ -145,9 +145,71 @@ classdef plots
             ylabel '# latent'
             ylim([0 110])
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath,'Supp2-D.eps'))
+            fig.save(fullfile(covest.plots.figPath,'Supp1-D.eps'))
         end
         
+        
+        function stimCond
+            % correlations and connectivity conditioned on the stimulus
+            doCorrs = false;
+            
+            c = covest.CovMatrix & 'nfolds=1';
+            c1 = c.pro('method->m1','sparse->s1','cov_matrix->c1');
+            c2 = c.pro('method->m2','sparse->s2','cov_matrix->c2');
+            [S1,S2,C1,C2,dirs,pval,selection] = ...
+                fetchn(covest.ActiveCells*pro(covest.OriTuning,...
+                'high_repeats->temp','von_pref','von_p_value')*c1*c2 & 'm1=92 && m2=93', ...
+                's2','s1','c1','c2','von_pref','von_p_value','selection');
+            dirs = cellfun(@(dirs,selection) dirs(selection)/pi*180, dirs, selection, 'uni', false);
+            pval = cellfun(@(pval,selection) pval(selection), pval, selection, 'uni', false);
+            if ~doCorrs
+                d =[
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval,90), S1, dirs, pval)'
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval, 0), S1, dirs, pval)'
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval,90), S2, dirs, pval)'
+                    cellfun(@(S,dirs,pval) ndegree(S,dirs,pval, 0), S2, dirs, pval)'
+                    ];
+            else
+                d =[
+                    cellfun(@(C,dirs,pval) avgCorr(C,dirs,pval,90), C1, dirs, pval)'
+                    cellfun(@(C,dirs,pval) avgCorr(C,dirs,pval, 0), C1, dirs, pval)'
+                    cellfun(@(C,dirs,pval) avgCorr(C,dirs,pval,90), C2, dirs, pval)'
+                    cellfun(@(C,dirs,pval) avgCorr(C,dirs,pval, 0), C2, dirs, pval)'
+                    ];
+            end
+            
+            d = d(:,~any(isnan(d)));
+            fig = Figure(1,'size',[40 40]);
+            plot(d([1,3],:),'-ro')
+            hold on
+            plot(d([2,4],:),'-gx')
+            xlim([0.5 2.5])
+            fig.cleanup
+            if doCorrs
+                fig.save(fullfile(covest.plots.figPath,'Supp5-A.eps'))
+            else
+                fig.save(fullfile(covest.plots.figPath,'Supp5-B.eps'))
+            end
+            
+            function ret = ndegree(S,dirs,pval,filt)
+                ix = pval < 0.01 & oriDiff(filt,dirs') < 40;
+                if sum(ix)<10
+                    ret = nan;
+                else
+                    ret = (1-cove.sparsity(S(ix,ix)))/(1-cove.sparsity(S));
+                end
+            end
+            
+            function ret = avgCorr(C,dirs,pval,filt)
+                ix = pval < 0.01 & oriDiff(filt,dirs') < 40;
+                if sum(ix)<10
+                    ret = nan;
+                else
+                    ret = cove.avgCorr(C(ix,ix));%/cove.avgCorr(C);
+                end
+            end
+            
+        end
         
         
         function fig2
@@ -190,14 +252,14 @@ classdef plots
         function fig3
             for f = {'Fig3','Supp3','Supp4'}
                 switch f{1}
-                    case {'Fig3','Supp3'}
+                    case {'Fig3','Supp4'}
                         pairs = {
                             0   90    'sample'
                             10  90    'diag'
                             30  90    'factor'
                             80  90    'sparse'
                             };
-                    case 'Supp4'
+                    case 'Supp3'
                         pairs = {
                             0   80    'sample'
                             10  80    'diag'
@@ -208,12 +270,12 @@ classdef plots
                         error 'unknown figure'
                 end
                 ticks = 0:0.01:1;
-                if any(strcmp(f{1},{'Fig3','Supp4'}))
+                if any(strcmp(f{1},{'Fig3','Supp3'}))
                     c = covest.CovMatrix & 'nfolds>1';
                     c1 = pro(c, 'method->m1','cv_loss->l1');
                     c2 = pro(c, 'method->m2','cv_loss->l2');
                     xlabl = 'nats/cell/bin';
-                elseif strcmp(f{1},'Supp3')
+                elseif strcmp(f{1},'Supp4')
                     c = covest.CovMatrix*covest.QuadLoss & 'nfolds>1';
                     c1 = pro(c, 'method->m1','quad_loss->l1');
                     c2 = pro(c, 'method->m2','quad_loss->l2');
@@ -248,6 +310,11 @@ classdef plots
                 set(gca,'Position',[.08 .3 0.90 0.7])
                 fig.cleanup
                 fig.save(fullfile(covest.plots.figPath, [f{1} '.eps']))
+                
+                fig = Figure(1,'size',[40 40]);
+                boxplot([enn' epn' epp'],'colors','k','labels',{'+/+' '-/-' '+/+'})
+                fig.cleanup
+                fig.save
             end
         end
         
@@ -497,7 +564,9 @@ classdef plots
             % panel A:  #latent vs #neurons
             [L,S,nCells,highlight] = fetchn(covest.CovMatrix*covest.ActiveCells & 'method=100' & 'nfolds=1', ...
                 'lowrank', 'sparse', 'ncells', '(mod(aod_scan_start_time,10000)=2031)->highlight');
+            fname = fullfile(covest.plots.figPath, 'Fig5-A.eps');
             fig = Figure(1,'size',[40 40]);
+            
             nLatent = cellfun(@(L) size(L,2), L);
             scatter(nCells,nLatent,17,nCells,'filled')
             colormap(flipud(hot)/1.5)
@@ -506,26 +575,29 @@ classdef plots
             set(gca,'XTick',[0 150 300])
             xlabel '# neurons'
             set(gca,'YTick',0:25:100)
-            ylabel '# latent'            
+            ylabel '# latent'
+            
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath, 'Fig5-A.eps'))
+            fig.save(fname)
             
             % panel B:  #node degree vs #neurons
-            fig = Figure(1,'size',[40 40]);            
-            nodeDegree = cellfun(@cove.nodeDegree, S);
-            scatter(nCells,nodeDegree,17,nCells,'filled')
+            fname = fullfile(covest.plots.figPath, 'Fig5-B.eps');
+            fig = Figure(1,'size',[40 40]);
+            
+            connectivity = 1-cellfun(@cove.sparsity, S);
+            scatter(nCells,connectivity*100,17,nCells,'filled')
             colormap(flipud(hot)/1.5)
-            hold on, plot(nCells(hix),nodeDegree(hix),'bo')
+            hold on, plot(nCells(hix),100*connectivity(hix),'bo')
             set(gca,'XTick',[0 150 300])
             xlabel '# neurons'
-            set(gca,'YTick',0:25:100)
-            ylabel '# avg node degree'            
-            ylim([0 77])
-            fig.cleanup
+            set(gca,'YTick',0:5:100)
+            ylabel '% connectivity'
             
-            fig.save(fullfile(covest.plots.figPath, 'Fig5-B.eps'))
+            fig.cleanup
+            fig.save(fname)
             
             % Panel C: average regularized partial correlation vs avg sample correlation
+            fname = fullfile(covest.plots.figPath, 'Fig5-C.eps');
             fig = Figure(1,'size',[40 40]);
             c = covest.CovMatrix & 'nfolds=1';
             c0 = c.pro('method->m0','corr_matrix->c1');
@@ -549,9 +621,10 @@ classdef plots
             fprintf('Averages: corrs %1.2e, pcorrs %1.2e\n', ...
                 mean(m0), mean(m1))
             fprintf('Coefficients of variation:  corrs %1.2f, pcorrs %1.2f\n', ...
-                std(m0)/mean(m0), std(m1)/mean(m1))            
+                std(m0)/mean(m0), std(m1)/mean(m1))
+            
             fig.cleanup
-            fig.save(fullfile(covest.plots.figPath, 'Fig5-C.eps'))
+            fig.save(fname)
             
             
             % Panel D: % negative interactions
@@ -582,10 +655,377 @@ classdef plots
             end
             
         end
+        
+        
+        function fig6_dist
+            % Figure 6, panels B, C, E, F
+            for vertical = [false true]  % false = panels B, D,  false = C, F
+                c = covest.CovMatrix & 'nfolds=1' & 'sparsity<0.97';
+                c0 = c.pro('method->m0','corr_matrix->c0') & 'm0=0';
+                c1 = c.pro('method->m1','corr_matrix','sparse') & 'm1=100';
+                rel = c0*c1*covest.Traces*covest.ActiveCells;
+                [xyz,selection,C0,C1,S] = rel.fetchn('cell_xyz','selection','c0','corr_matrix','sparse');
+                
+                % remove invactive cells
+                xyz = cellfun(@(xyz,selection) xyz(selection,:), xyz, selection, 'uni', false);
+                
+                % convert to correlations and partial correlations, respectively
+                C0 = cellfun(@corrcov, C0, 'uni', false);  % sample correlations
+                C1 = cellfun(@(C) -corrcov(inv(C)), C1, 'uni', false);  % regularized partial correlations
+                
+                % compute average correlations
+                avgC0 = cellfun(@(C) mean(offDiag(C)), C0);
+                avgC1 = cellfun(@(C) mean(offDiag(C)), C1);
+                avgConn = cellfun(@(S) mean(logical(offDiag(S))), S);  % average connectivity
+                
+                % matrices of lateral and vertical distances
+                Dx = cellfun(@(xyz) distMatrix(xyz(:,1:2)), xyz, 'uni',false);
+                Dz = cellfun(@(xyz) distMatrix(xyz(:,  3)), xyz, 'uni',false);
+                
+                % get off-diagonal elements
+                C0 = cellfun(@offDiag, C0, 'uni',false);
+                C1 = cellfun(@offDiag, C1, 'uni',false);
+                S  = cellfun(@offDiag, S,  'uni',false);
+                Dx = cellfun(@offDiag, Dx, 'uni',false);
+                Dz = cellfun(@offDiag, Dz, 'uni',false);
+                
+                % eliminate cell pairs that are too distant in the orthogonal direction
+                maxDist = 30; % um
+                if vertical
+                    edges = [0 25 60 130];
+                    r = Dx;
+                    D = Dz;
+                else
+                    edges = [0 25 75 150 250];
+                    r = Dz;
+                    D = Dx;
+                end
+%                C0 = cellfun(@(C,r) C(r<maxDist), C0, r, 'uni',false);
+%                C1 = cellfun(@(C,r) C(r<maxDist), C1, r, 'uni',false);
+%                S  = cellfun(@(C,r) C(r<maxDist), S,  r, 'uni',false);
+%                D  = cellfun(@(C,r) C(r<maxDist), D,  r, 'uni',false);
+                
+                % do statistics
+                ds = cellfun(@(D,S) mat2dataset([D S>0 S<0], 'VarNames', {'distance','neg','pos'}), D, S, 'uni', false);                                
+                mdlPos = cellfun(@(ds) fitglm(ds,'pos ~ distance','Distribution','binomial'), ds, 'uni', false);
+                mdlNeg = cellfun(@(ds) fitglm(ds,'neg ~ distance','Distribution','binomial'), ds, 'uni', false);
+                posP = cellfun(@(mdl) mdl.Coefficients.pValue(2), mdlPos);
+                negP = cellfun(@(mdl) mdl.Coefficients.pValue(2), mdlNeg);
+                tstat = cellfun(@(pos,neg) (pos.Coefficients.Estimate(2)-neg.Coefficients.Estimate(2))/norm([pos.Coefficients.SE(2) neg.Coefficients.SE(2)]), mdlPos, mdlNeg);
+                diffP = arrayfun(@(t,n) tcdf(t,n), tstat, cellfun(@(D) sum(D>0),D));  % p-value of difference between the coefficients
+                
+                % bin distances for plots
+                nBins = length(edges)-1;
+                D = cellfun(@(oriDiffs) sum(bsxfun(@ge,oriDiffs,edges),2), D, 'uni', false);
+                
+                % exclude sites that don't have enough cell pairs in each bin
+                hasEnough = 50 < cellfun(@(D) min(hist(D,1:nBins)), D);
+                assert(all(hasEnough))
+                fprintf('Qualifying sites n=%d\n', sum(hasEnough))
+                clear hasEnough
+                
+                % panel B or C: average correlations vs distance
+                if vertical
+                    fig = Figure(1,'size',[40,30]);
+                    fname = fullfile(covest.plots.figPath, 'Fig6-C.eps');
+                else
+                    fig = Figure(1,'size',[45,30]);
+                    fname = fullfile(covest.plots.figPath, 'Fig6-B.eps');
+                end
+                
+                C0 = cellfun(@(C,D) accumarray(D,C,[nBins 1],@mean), C0, D, 'uni',false);
+                C1 = cellfun(@(C,D) accumarray(D,C,[nBins 1],@mean), C1, D, 'uni',false);
+                C0 = bsxfun(@rdivide, cat(2,C0{:})', 1);
+                C1 = bsxfun(@rdivide, cat(2,C1{:})', 1);
+                clear avgC0 avgC1
+                
+                ticks = conv(edges,[.5 .5],'valid')';
+                
+                errorbar(ticks,mean(C0),std(C0)/sqrt(size(C0,1)-1), 'k.-')
+                hold on
+                errorbar(ticks,mean(C1),std(C1)/sqrt(size(C1,1)-1), 'r.-')
+                plot(ticks,mean(C0), 'k.-', 'LineWidth', 1)
+                plot(ticks,mean(C1), 'r.-', 'LineWidth', 1)
+                plot(xlim,[1 1],'k:')
+                hold off
+                set(gca,'XTick',edges(1:end-1),'YTick',[0 1])
+                xlim([0 edges(end)])
+                ylim(ylim.*[0 1])
+                if vertical
+                    xlabel '\Deltaz (\mum)'
+                else
+                    xlabel '\Deltax (\mum)'
+                end
+                ylabel 'avg. norm. corr.'
+                
+                fig.cleanup
+                fig.save(fname)
+                clear C1 C0
+                
+                % panels E and F: connectivity vs distance
+                if vertical
+                    fig = Figure(1,'size',[40,30]);
+                    fname = fullfile(covest.plots.figPath, 'Fig6-F.eps');
+                else
+                    fig = Figure(1,'size',[45,30]);
+                    fname = fullfile(covest.plots.figPath, 'Fig6-E.eps');
+                end
+                posColor = [0 .5 0];
+                negColor = [.5 0 0];
+                
+                neg = cellfun(@(S,D) accumarray(D,S>0,[nBins 1], @mean), S, D, 'uni',false);
+                pos = cellfun(@(S,D) accumarray(D,S<0,[nBins 1], @mean), S, D, 'uni',false);
+                neg = bsxfun(@rdivide, cat(2,neg{:})', avgConn);
+                pos = bsxfun(@rdivide, cat(2,pos{:})', avgConn);
+                clear avgConn
+                
+                errorbar(ticks,mean(pos),std(pos)/sqrt(size(pos,1)-1), '.-', 'Color',posColor)
+                hold on
+                errorbar(ticks,mean(neg),std(neg)/sqrt(size(neg,1)-1), '.-', 'Color',negColor)
+                
+                plot(ticks,mean(pos), '.-', 'LineWidth', 1, 'Color', posColor)
+                plot(ticks,mean(neg), '.-', 'LineWidth', 1, 'Color', negColor)
+                plot(xlim,[1 1],'k:')
+                hold off
+                set(gca,'XTick',edges(1:end-1),'YTick',[0 1])
+                xlim([0 edges(end)])
+                ylim(ylim.*[0 1])
+                if vertical
+                    xlabel '\Deltaz (\mum)'
+                else
+                    xlabel '\Deltax (\mum)'
+                end
+                ylabel 'rel. connectivity'
+                
+                fig.cleanup
+                fig.save(fname)
+            end
+            
+            function D = distMatrix(xyz)
+                p = size(xyz,1);
+                [i,j] = ndgrid(1:p,1:p);
+                D = reshape(sqrt(sum((xyz(i,:)-xyz(j,:)).^2,2)),p,p);
+            end
+        end
+        
+        
+        function fig6_ori
+            % Figure 6, panels A and D.
+            
+            % get all data
+            c = covest.CovMatrix & 'nfolds=1' & 'sparsity<0.97';
+            c0 = c.pro('method->m0', 'corr_matrix->c0') & 'm0=0';
+            c1 = c.pro('method->m1','sparse','corr_matrix') & 'm1=100';
+            rel = c0*c1*covest.ActiveCells*pro(covest.OriTuning,'high_repeats->hrepeats','*');
+            [pval,ori,selection,C0,C1,S] = rel.fetchn('von_p_value','von_pref','selection','c0','corr_matrix','sparse');
+            
+            % remove inactive cells
+            ori = cellfun(@(ori,selection) ori(selection)*180/pi, ori, selection,'uni',false);
+            pval = cellfun(@(pval,selection) pval(selection), pval, selection,'uni',false);
+            clear selection
+            
+            % convert to correlations and partial correlations, respectively
+            C0 = cellfun(@corrcov, C0, 'uni', false);  % sample correlations
+            C1 = cellfun(@(C) -corrcov(inv(C)), C1, 'uni', false);  % regularized partial correlations
+            
+            % remove untuned cells
+            alpha = .05;
+            ori = cellfun(@(ori,pval) ori(pval<alpha), ori, pval, 'uni',false);
+            C0 = cellfun(@(C,pval) C(pval<alpha,pval<alpha), C0, pval, 'uni',false);
+            C1 = cellfun(@(C,pval) C(pval<alpha,pval<alpha), C1, pval, 'uni',false);
+            S  = cellfun(@(C,pval) C(pval<alpha,pval<alpha), S, pval, 'uni',false);
+            clear pval
+            
+            % matrices of orientation differences
+            D = cellfun(@oriDiffMatrix, ori, 'uni',false);
+            
+            % get off-diagonal elements
+            D  = cellfun(@offDiag, D,  'uni', false);
+            C0 = cellfun(@offDiag, C0, 'uni',false);
+            C1 = cellfun(@offDiag, C1, 'uni',false);
+            S  = cellfun(@offDiag, S,  'uni',false);
+            
+            % bin orientation differences
+            edges = [0 15 45 90];
+            nBins = length(edges)-1;
+            ds = cellfun(@(D,S) mat2dataset([D S>0 S<0], 'VarNames', {'distance','neg','pos'}), D, S, 'uni', false);
+            D = cellfun(@(oriDiffs) sum(bsxfun(@ge,oriDiffs,edges),2), D, 'uni', false);
+            
+            % do statistics
+            mdlPos = cellfun(@(ds) fitglm(ds,'pos ~ distance','Distribution','binomial'), ds, 'uni', false);
+            mdlNeg = cellfun(@(ds) fitglm(ds,'neg ~ distance','Distribution','binomial'), ds, 'uni', false);
+            posP = cellfun(@(mdl) mdl.Coefficients.pValue(2), mdlPos);
+            negP = cellfun(@(mdl) mdl.Coefficients.pValue(2), mdlNeg);
+            
+            tstat = cellfun(@(pos,neg) (pos.Coefficients.Estimate(2)-neg.Coefficients.Estimate(2))/norm([pos.Coefficients.SE(2) neg.Coefficients.SE(2)]), mdlPos, mdlNeg);
+            diffP = arrayfun(@(t,n) tcdf(t,n), tstat, cellfun(@(D) sum(D>0),D));  % p-value of difference between the coefficients
+
+            % exclude sites that don't have enough tuned cell pairs in each bin
+            hasEnough = 100 < cellfun(@(D) min(hist(D,1:nBins)), D);
+            fprintf('Qualifying sites n=%d\n', sum(hasEnough))
+            D = D(hasEnough);
+            C0 = C0(hasEnough);
+            C1 = C1(hasEnough);
+            S = S(hasEnough);
+            clear hasEnough
+            
+            % panel A: average correlations vs ori tuning
+            fig = Figure(1,'size',[50,30]);
+            fname = fullfile(covest.plots.figPath, 'Fig6-A.eps');
+            
+            % bin correlations into bins specified by edges
+            C0 = cellfun(@(C,D) accumarray(D,C,[nBins 1],@mean), C0, D, 'uni',false);
+            C1 = cellfun(@(C,D) accumarray(D,C,[nBins 1],@mean), C1, D, 'uni',false);
+            C0 = cat(2,C0{:})';
+            C1 = cat(2,C1{:})';
+                       
+            ticks = conv(edges,[.5 .5],'valid')';
+            
+            [axx,h1,h2] = plotyy(ticks,C0,ticks,C1);
+            set(h1,'Color',[.7 .7 .7])
+            set(h2,'Color',[1. .7 .7])
+            set(axx(2),'YColor','r')
+            hold on
+            axes(axx(1))
+            hold on
+            plot(ticks,mean(C0), 'k.-', 'LineWidth', 1)
+            hold off
+            xlabel 'noise corrs'
+            
+            axes(axx(2)) 
+            hold on
+            plot(ticks,mean(C1), 'r.-', 'LineWidth', 1, 'MarkerSize',9)
+            hold off
+            ylabel 'partial noise corrs'
+            
+            set(axx,'XTick',edges,'XLim',[0 90])
+            xlabel '\Deltaori (degrees)'
+            ylabel 'norm. mean corr.'
+            fig.cleanup
+            fig.save(fname)
+            
+            % panel D: connectivity vs ori tuning
+            fig = Figure(1,'size',[40,30]);
+            fname = fullfile(covest.plots.figPath, 'Fig6-D.eps');
+            posColor = [0 .5 0];
+            negColor = [.5 0 0];
+            
+            neg = cellfun(@(S,D) accumarray(D,S>0,[nBins 1], @mean), S, D, 'uni',false);
+            pos = cellfun(@(S,D) accumarray(D,S<0,[nBins 1], @mean), S, D, 'uni',false);
+            neg = bsxfun(@rdivide, cat(2,neg{:})', avgConn);
+            pos = bsxfun(@rdivide, cat(2,pos{:})', avgConn);
+            clear avgConn
+            
+            errorbar(ticks,mean(pos),std(pos)/sqrt(size(pos,1)-1), '.-', 'Color',posColor)
+            hold on
+            errorbar(ticks,mean(neg),std(neg)/sqrt(size(neg,1)-1), '.-', 'Color',negColor)
+            
+            plot(ticks,mean(pos), '.-', 'LineWidth', 1, 'Color', posColor)
+            plot(ticks,mean(neg), '.-', 'LineWidth', 1, 'Color', negColor)
+            plot(xlim,[1 1],'k:')
+            hold off
+            set(gca,'XTick',edges,'YTick',[0 1])
+            xlim([0 90])
+            ylim(ylim.*[0 1])
+            xlabel '\Deltaori (degrees)'
+            ylabel 'norm. connectivity   '
+            
+            fig.cleanup
+            fig.save(fname)
+        end
     end
 end
 
 
 function s=nozero(f)
-s = arrayfun(@(f) strrep(sprintf('%g',f),'0.','.'), f, 'uni', false);
+% remove leading zeros in decimal fractions
+if isscalar(f)
+    s = sprintf('%g',f);
+    if strncmp(s,'-0.',3)
+        s(2)='';
+    elseif strncmp(s,'0.',2)
+        s(1)='';
+    end
+else
+    s = arrayfun(@(f) nozero(f), f, 'uni', false);
 end
+end
+
+
+function ret = oriDiffMatrix(ori)
+% make a matrix of orientation differences
+ret = oriDiff(ori,ori');
+end
+
+
+function C = corrVar(Z,varComp)
+% compute the correlation matrix with different variance assumptions
+[nBins,nConds,nTrials,nCells] = size(Z);
+
+M = nanmean(Z,3);
+Z = bsxfun(@minus, Z, M);
+
+% common variance
+V0 = nanvar(reshape(Z,[],nCells));
+V0 = reshape(V0,1,1,1,nCells);
+a = 0.01; % very modest regularization
+
+switch varComp
+    case 'common'
+        V = V0;
+    case 'bin'
+        % bin-wise variance
+        V = nanvar(Z,[],3);
+    case 'cond'
+        V = mean(nanvar(Z,[],3));
+    otherwise
+        error 'unknown variance computation'
+end
+V = bsxfun(@plus, a*V0, (1-a)*V);
+Z = bsxfun(@rdivide, Z, sqrt(V));
+C = corrcov(cove.cov(reshape(Z,[],nCells)));
+end
+
+
+function d=oriDiff(ori1,ori2)
+% compute the absolute difference between orientations ori1 and ori2 (in degrees)
+ori1 = mod(ori1, 180);
+ori2 = mod(ori2, 180);
+s = bsxfun(@plus, ori1, ori2); % ensure that nans remain in place since max(nan,A)==A
+b1 = s - bsxfun(@max,ori1,ori2);
+b2 = s - bsxfun(@min,ori1,ori2);
+d = min(b2-b1,b1+180-b2);
+end
+
+function ret = offDiag(C)
+% return the vector of off-diagonal elements of symmetric matrix C
+p = size(C,1);
+[i,j] = ndgrid(1:p,1:p);
+ret = C(i<j);
+end
+
+
+function [r1,r2,p] = boostrapRateRatios(A1,A2,B1,B2)
+% A1, A2, B1, and B2 are Bernouilli variables
+%
+% H1:  rate(A1)/rate(A2) > rate(B1)/rate(B2)
+% H0:  rate(A1)/rate(A2) > rate(B1)/rate(B2)
+%
+
+nSamples = 1e4;
+
+r1 = mean(A1)/mean(A2);
+r2 = mean(B1)/mean(B2);
+
+% distribution of rates 
+g1 = nan(nSamples,1);
+g2 = nan(nSamples,1);
+for i=1:nSamples
+end
+
+
+
+end
+
+
+

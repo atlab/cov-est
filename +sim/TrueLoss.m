@@ -2,13 +2,13 @@
 sim.TrueLoss (computed) # true loss based on ground truth
 -> sim.CovMatrix
 -----
-true_loss  : longblob
+true_loss  : double
 %}
 
 classdef TrueLoss < dj.Relvar & dj.AutoPopulate
     
     properties
-        popRel = sim.CovMatrix
+        popRel = sim.CovMatrix & 'nfolds=1'
     end
     
     methods(Access=protected)

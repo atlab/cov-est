@@ -20,8 +20,8 @@ classdef plots
                 imwrite(img,fullfile(sim.plots.figPath,sprintf('Fig1-2-%c.png',64+i)))
             end
             
-            for m=1:2
-                model.model = m;
+            for mi=1:2
+                model.model = mi;
                
                 % Row 3
                 C = arrayfun(@(k) ...
@@ -57,7 +57,6 @@ classdef plots
                     dj.struct.tabulate(s,'true_loss','truth_type','method','sample_size');
                 xticks = sampleSize/1000;
                 yticks = 0:0.02:0.1;
-                nSamples = size(loss,4);
                 offset = -0.5*linspace(-.1,.1,length(method));
                 x = exp(bsxfun(@plus, log(sampleSize'), offset));
                 for i=1:length(truth)
@@ -115,6 +114,40 @@ classdef plots
                     xlabel 'sample size \times1000'
                     fig.cleanup
                     fig.save(fullfile(sim.plots.figPath, sprintf('Fig1-6-%c-%u.eps',64+i, model.model)))
+                end
+                
+                % Supp  (quadratic loss)
+                s = fetch(sim.QuadLoss*pro(sim.Truth,'truth_type') & model ...
+                    & 'nfolds>1' & truthTypes, ...
+                    'truth_type', 'quad_loss', 'k', 'ORDER BY truth, method, sample_size');
+                [loss,truth,~,sampleSize,~] = ...
+                    dj.struct.tabulate(s,'quad_loss','truth_type','method','sample_size','k');
+                loss = squeeze(mean(loss,4));
+                for i=1:length(truth)
+                    loss(i,:,:,:) = bsxfun(@minus, loss(i,:,:,:), loss(i,i+1,:,:));
+                end
+                
+                for i=1:length(truth)
+                    fig = Figure(1,'size',[35 55]);
+                    m = squeeze(mean(loss(i,:,:,:),4))';
+                    e = squeeze(std(loss(i,:,:,:),[],4))'; %/sqrt(nSamples);
+                    for iMethod=1:size(m,2)
+                        plot(x(:,iMethod), m(:,iMethod), styles{iMethod}, ...
+                            'Color',colors{iMethod}, 'LineWidth',.5, 'MarkerSize',4)
+                        hold on
+                        myerrorbar(x(:,iMethod),m(:,iMethod),e(:,iMethod), ...
+                            'Marker','none', 'Color',colors{iMethod}, 'LineWidth',.5)
+                    end
+                    hold off
+                    
+                    set(gca,'XTick',sampleSize,'XTickLabel',nozero(xticks),...
+                        'YTick',yticks/10,'YTickLabel',nozero(yticks), ...
+                        'XScale','log','Position',[.2 .18 .8 .8])
+                    ylim([-0.02 .045]/10)
+                    xlim([200 5000])
+                    xlabel 'sample size \times1000'
+                    fig.cleanup
+                    fig.save(fullfile(sim.plots.figPath, sprintf('Fig1-Supp-%c-%u.eps',64+i, model.model)))
                 end
             end
         end

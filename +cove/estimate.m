@@ -94,6 +94,18 @@ switch reg
         extras.H = H*sqrt(D);
         C = inv(extras.S - extras.H*extras.H');
         
+    case 'lv-glasso refit'
+        assert(length(hypers)==2)
+        cove.set('max_latent',hypers(2))   % allow any number of latent variables
+        scale = mean(diag(C));
+        extras = cove.lvglasso(C/scale,hypers(1),0.001,cove.set);
+        extras.S = extras.S/scale;  % scale back
+        extras.L = extras.L/scale;
+        [H,D] = svds(extras.L,sum(~~extras.eigL));
+        extras.H = H*sqrt(D);
+        C = inv(extras.S - extras.H*extras.H');
+        
+
     otherwise
         error 'unknown covariance estimator'
 end
